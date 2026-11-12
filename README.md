@@ -107,14 +107,18 @@ Fund the wallets on Base Sepolia:
 ### Run
 
 - Gasless payment spike: `npm run spike` sends 0.10 USDC from the customer to the shop. The customer signs, the relayer pays the gas, and the script prints the Basescan link and balances. Each order id can be paid once, so use `npm run spike -- --order spike-2` (and so on) to run it again.
-- Server and till page: _coming soon_
+- Server and till page:
+  1. Optional: to use Supabase, set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (the project's secret key) in `.env`, and run `apps/server/supabase/schema.sql` once in the Supabase SQL Editor. Leave `SUPABASE_URL` empty to use the in-memory store.
+  2. `npm run dev:server` (or `npm run start:server` without auto-reload).
+  3. Open the till URL the server prints. On a phone, use the LAN address (for example `http://192.168.x.x:3000/vendor/till.html`) so the QR code points somewhere the customer's phone can reach.
+  4. The payment sound `apps/server/public/audio/paid.mp3` is a placeholder (empty file). We will record the real clip; until then the till plays a short chime.
 - Customer app: _coming soon_
 
 ## Status
 
 - [x] Milestone 1: scaffold, shared package, wallet tools
 - [x] Milestone 2: gasless payment spike ([first transfer on Base Sepolia](https://sepolia.basescan.org/tx/0xa3805a9eba443c28d0b35bad5bcc02793c19334a1e03d7a992e9e5de56d27b3a))
-- [ ] Milestone 3: server API and till page
+- [x] Milestone 3: server API and till page
 - [ ] Milestone 4: customer app, end to end
 
 ## Roadmap

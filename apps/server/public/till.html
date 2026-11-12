@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#111111">
+  <title>Kasi Rails Till</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Keypad: enter the amount in rand -->
+  <main id="screen-keypad" class="screen">
+    <header class="bar">
+      <span id="shop-name" class="shop">Kasi Rails</span>
+      <span id="rate" class="muted"></span>
+    </header>
+    <div class="amount" aria-live="polite"><span class="currency">R</span><span id="amount">0</span></div>
+    <div class="keypad" role="group" aria-label="Amount keypad">
+      <button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button>
+      <button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button>
+      <button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button>
+      <button data-key=".">.</button><button data-key="0">0</button><button data-key="back" aria-label="Delete">&#9003;</button>
+    </div>
+    <p id="keypad-error" class="error" role="alert"></p>
+    <button id="charge" class="primary" disabled>Charge</button>
+  </main>
+
+  <!-- QR: waiting for the customer to pay -->
+  <main id="screen-qr" class="screen" hidden>
+    <div class="amount small"><span id="qr-zar"></span></div>
+    <div id="qr-usdc" class="muted"></div>
+    <img id="qr" class="qr" alt="Payment QR code">
+    <div class="countdown"><div id="countdown-bar"></div></div>
+    <div id="qr-status" class="status">Scan to pay</div>
+    <button id="cancel" class="secondary">Cancel</button>
+  </main>
+
+  <!-- Paid -->
+  <main id="screen-paid" class="screen result paid" hidden>
+    <div class="big">PAID</div>
+    <div id="paid-zar" class="amount"></div>
+    <a id="paid-tx" class="txlink" target="_blank" rel="noopener">View payment</a>
+    <button class="new-sale secondary">New sale</button>
+  </main>
+
+  <!-- Expired -->
+  <main id="screen-expired" class="screen result expired" hidden>
+    <div class="big">Expired</div>
+    <div class="sub">Charge again</div>
+    <div id="expired-zar" class="amount"></div>
+    <button id="charge-again" class="primary">Charge again</button>
+    <button class="new-sale secondary">New sale</button>
+  </main>
+
+  <audio id="paid-sound" src="audio/paid.mp3" preload="auto"></audio>
+  <script src="till.js"></script>
+</body>
+</html>

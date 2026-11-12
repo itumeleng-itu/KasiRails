@@ -1,12 +1,19 @@
-import { createPublicClient, createWalletClient, http, type Hex } from 'viem';
+import { createPublicClient, createWalletClient, http, nonceManager, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { CHAIN, RPC_URL, USDC_ADDRESS, usdcAbi } from '@kasi-rails/shared';
 
 export const publicClient = createPublicClient({ chain: CHAIN, transport: http(RPC_URL) });
 
+/** The nonce manager keeps concurrent submissions from reusing the same account nonce. */
 export function createRelayer(privateKey: Hex) {
-  return createWalletClient({ account: privateKeyToAccount(privateKey), chain: CHAIN, transport: http(RPC_URL) });
+  return createWalletClient({
+    account: privateKeyToAccount(privateKey, { nonceManager }),
+    chain: CHAIN,
+    transport: http(RPC_URL),
+  });
 }
+
+export type Relayer = ReturnType<typeof createRelayer>;
 
 export interface UsdcDomain {
   name: string;

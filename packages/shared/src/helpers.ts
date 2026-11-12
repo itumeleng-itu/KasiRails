@@ -19,6 +19,15 @@ export function zarCentsToUsdc(zarCents: number, zarPerUsdc: number): bigint {
   return (BigInt(zarCents) * 10_000n * RATE_SCALE) / rate;
 }
 
+/** Converts USDC base units to rand cents, rounded down. */
+export function usdcToZarCents(usdc: bigint, zarPerUsdc: number): number {
+  if (!Number.isFinite(zarPerUsdc) || zarPerUsdc <= 0) {
+    throw new Error(`zarPerUsdc must be a positive number, got ${zarPerUsdc}`);
+  }
+  const rate = BigInt(Math.round(zarPerUsdc * Number(RATE_SCALE)));
+  return Number((usdc * rate) / (10_000n * RATE_SCALE));
+}
+
 /** EIP-3009 nonce for an order: keccak256 of the UTF-8 order id. */
 export function orderIdToNonce(orderId: string): Hex {
   return keccak256(stringToBytes(orderId));

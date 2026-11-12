@@ -9,6 +9,8 @@
   ],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:server": "npm run dev -w @kasi-rails/server",
+    "start:server": "npm run start -w @kasi-rails/server",
     "gen-wallet": "npm run gen-wallet -w @kasi-rails/server",
     "setup:wallets": "tsx apps/server/scripts/setup-wallets.ts",
     "spike": "tsx apps/server/scripts/spike-eip3009.ts"
