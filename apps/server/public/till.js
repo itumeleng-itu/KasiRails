@@ -12,6 +12,8 @@
   var entry = ''; // what's been typed, e.g. "85.5"
   var current = null; // { order, deadline, pollTimer, tickTimer, ttlMs }
   var lastZarCents = 0;
+  // Where phones reach the server. The browser's own origin may be localhost, which a phone can't use.
+  var apiUrl = window.location.origin;
   var audioCtx = null;
 
   function show(name) {
@@ -137,7 +139,7 @@
     var ttlMs = Date.parse(order.expiresAt) - Date.parse(order.createdAt);
     current = { order: order, ttlMs: ttlMs, deadline: Date.now() + ttlMs };
 
-    var payload = JSON.stringify({ kasiRails: 1, orderId: order.id, api: window.location.origin });
+    var payload = JSON.stringify({ kasiRails: 1, orderId: order.id, api: apiUrl });
     $('qr').src = 'qr.svg?data=' + encodeURIComponent(payload);
     $('qr-zar').textContent = formatRand(order.zarCents);
     $('qr-usdc').textContent = '≈ ' + formatUsdc(order.usdcAmount);
@@ -215,6 +217,7 @@
   }).catch(function () {});
   api('/health').then(function (h) {
     if (h.shopName) { $('shop-name').textContent = h.shopName; document.title = h.shopName + ' · Till'; }
+    if (h.apiUrl) apiUrl = h.apiUrl;
   }).catch(function () {
     $('keypad-error').textContent = 'Cannot reach the server.';
   });

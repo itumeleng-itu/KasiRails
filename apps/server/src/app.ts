@@ -9,6 +9,7 @@ import type { Config } from './config';
 import { HttpError, type Payments } from './payments';
 import { getRate } from './rate';
 import type { OrderRepo } from './repo';
+import { publicUrl } from './network';
 import { ROOT_DIR } from './paths';
 
 const PUBLIC_DIR = resolve(ROOT_DIR, 'apps/server/public');
@@ -47,7 +48,7 @@ export function createApp(deps: { config: Config; repo: OrderRepo; payments: Pay
   }
 
   app.get('/health', (_req, res) => {
-    res.json({ ok: true, shopName: config.shopName, store: repo.kind, time: new Date().toISOString() });
+    res.json({ ok: true, shopName: config.shopName, apiUrl: publicUrl(config.port, config.publicUrlOverride), store: repo.kind, time: new Date().toISOString() });
   });
 
   app.get('/rate', async (_req, res) => {

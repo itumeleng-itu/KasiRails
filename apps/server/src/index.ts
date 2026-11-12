@@ -1,19 +1,12 @@
-import { networkInterfaces } from 'node:os';
 import { addressUrl } from '@kasi-rails/shared';
 import { createApp } from './app';
 import { createRelayer } from './chain';
 import { loadConfig } from './config';
 import { createPayments } from './payments';
+import { lanAddresses, publicUrl } from './network';
 import { createOrderRepo } from './repo';
 
 const SWEEP_INTERVAL_MS = 5_000;
-
-function lanAddresses(): string[] {
-  return Object.values(networkInterfaces())
-    .flat()
-    .filter((n) => n && n.family === 'IPv4' && !n.internal)
-    .map((n) => n!.address);
-}
 
 async function main() {
   const config = loadConfig();
@@ -42,8 +35,9 @@ async function main() {
     console.log(`  Store:    ${repo.kind}`);
     console.log(`  Shop:     ${config.shopAddress}  ${addressUrl(config.shopAddress)}`);
     console.log(`  Relayer:  ${relayer.account.address}  ${addressUrl(relayer.account.address)}`);
+    console.log(`  Phones:   ${publicUrl(config.port, config.publicUrlOverride)}  (put in till QR codes; set PUBLIC_URL to override)`);
     console.log(`  Till:     http://localhost:${config.port}/vendor/till.html`);
-    for (const ip of lanAddresses()) console.log(`            http://${ip}:${config.port}/vendor/till.html  (use this on the phone)`);
+    for (const ip of lanAddresses()) console.log(`            http://${ip}:${config.port}/vendor/till.html`);
   });
 }
 

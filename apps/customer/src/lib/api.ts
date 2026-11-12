@@ -1,8 +1,22 @@
+import Constants from 'expo-constants';
 import type { Order } from '@kasi-rails/shared';
 import type { TransferAuthorization, UsdcDomain } from './wallet';
 
-/** Default server, used for the balance. Payments use the server named in the shop's QR code. */
-export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/+$/, '');
+const SERVER_PORT = 3000;
+
+/**
+ * Default server, used for the balance. Payments use the server named in the shop's QR code.
+ * EXPO_PUBLIC_API_URL wins if set; otherwise, in development, use the computer Expo is served
+ * from (the server runs there too), so switching Wi-Fi networks needs no config change.
+ */
+function defaultApiUrl(): string {
+  const configured = process.env.EXPO_PUBLIC_API_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, '');
+  const host = Constants.expoConfig?.hostUri?.split(':')[0];
+  return host ? `http://${host}:${SERVER_PORT}` : '';
+}
+
+export const API_URL = defaultApiUrl();
 
 const TIMEOUT_MS = 15_000;
 const PAY_TIMEOUT_MS = 70_000; // the server waits up to ~45s for the network to confirm
@@ -72,7 +86,9 @@ export function parseTillQr(data: string): { orderId: string; api: string } | nu
   try {
     const parsed = JSON.parse(data);
     if (parsed?.kasiRails !== 1 || typeof parsed.orderId !== 'string' || !parsed.orderId) return null;
-    const api = typeof parsed.api === 'string' && /^https?:\/\//.test(parsed.api) ? parsed.api.replace(/\/+$/, '') : API_URL;
+    let api = typeof parsed.api === 'string' && /^https?:\/\//.test(parsed.api) ? parsed.api.replace(/\/+$/, '') : API_URL;
+    // "localhost" in the QR means the till's computer, which this phone can't reach by that name.
+    if (/^https?:\/\/(localhost|127\.|\[::1\])/i.test(api) && API_URL) api = API_URL;
     return { orderId: parsed.orderId, api };
   } catch {
     return null;
