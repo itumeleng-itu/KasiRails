@@ -6,16 +6,26 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FriendsSheet } from '@/components/friends-sheet';
 import { ArrowIcon, EyeIcon, PersonIcon } from '@/components/icons';
 import { BigButton, colors } from '@/components/ui';
-import { getBalance, getHistory, type Balance, type HistoryItem } from '@/lib/api';
+import { usdcToZarCents } from '@kasi-rails/shared';
+
+import { getHistory, type HistoryItem } from '@/lib/api';
+import { readRate, readUsdcBalance } from '@/lib/chain';
 import { formatDollars, formatRand, formatWhen, shortCode } from '@/lib/format';
 import { findFriend, getHideBalance, listFriends, setHideBalance, type Friend } from '@/lib/friends';
 import { getAddress } from '@/lib/wallet';
 
 const HIDDEN = 'R ••••••';
 
+interface Money {
+  usdcAmount: bigint;
+  zarCents: number;
+  zarPerUsdc: number;
+  liveRate: boolean;
+}
+
 export default function Home() {
   const insets = useSafeAreaInsets();
-  const [balance, setBalance] = useState<Balance | null>(null);
+  const [balance, setBalance] = useState<Money | null>(null);
   const [history, setHistory] = useState<HistoryItem[] | null>(null);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [hidden, setHidden] = useState(false);
@@ -31,9 +41,13 @@ export default function Home() {
       return;
     }
     await Promise.all([
-      getBalance(address)
-        .then((b) => (setBalance(b), setBalanceError(null)))
-        .catch((err) => setBalanceError(err instanceof Error ? err.message : 'Could not load your balance.')),
+      // Read straight from the chain so the balance shows even if the shop's server is unreachable.
+      Promise.all([readUsdcBalance(address), readRate()])
+        .then(([usdcAmount, rate]) => {
+          setBalance({ usdcAmount, zarCents: usdcToZarCents(usdcAmount, rate.zarPerUsdc), zarPerUsdc: rate.zarPerUsdc, liveRate: rate.live });
+          setBalanceError(null);
+        })
+        .catch(() => setBalanceError("Couldn't update your balance. Check your internet and pull down to try again.")),
       getHistory(address)
         .then((h) => (setHistory(h), setHistoryError(null)))
         .catch((err) => setHistoryError(err instanceof Error ? err.message : 'Could not load your history.')),
@@ -79,7 +93,11 @@ export default function Home() {
           {hidden ? HIDDEN : balance ? formatRand(balance.zarCents) : '…'}
         </Text>
         {!hidden && balance ? <Text style={styles.sub}>{formatDollars(balance.usdcAmount)}</Text> : null}
-        {balance ? <Text style={styles.rate}>Today: US$1 = R{balance.zarPerUsdc.toFixed(2)}</Text> : null}
+        {balance ? (
+          <Text style={styles.rate}>
+            {balance.liveRate ? 'Today' : 'Estimated'}: US$1 = R{balance.zarPerUsdc.toFixed(2)}
+          </Text>
+        ) : null}
         {balanceError ? <Text style={styles.error}>{balanceError}</Text> : null}
       </View>
 
@@ -89,8 +107,13 @@ export default function Home() {
       </View>
 
       <Text style={styles.sectionTitle}>Recent activity</Text>
-      {historyError ? <Text style={styles.error}>{historyError}</Text> : null}
-      {history && history.length === 0 ? <Text style={styles.empty}>No payments yet. Top up at the shop to get started.</Text> : null}
+      {history && history.length === 0 ? <Text style={styles.empty}>No history</Text> : null}
+      {!history && historyError ? (
+        <>
+          <Text style={styles.empty}>No history to show</Text>
+          <Text style={styles.error}>{historyError}</Text>
+        </>
+      ) : null}
       {!history && !historyError ? <Text style={styles.empty}>Loading…</Text> : null}
     </View>
   );

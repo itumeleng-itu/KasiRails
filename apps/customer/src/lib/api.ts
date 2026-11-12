@@ -50,7 +50,7 @@ async function request<T>(base: string, path: string, init?: RequestInit, timeou
   try {
     res = await fetch(base + path, { ...init, signal: controller.signal });
   } catch {
-    throw new ApiError("Can't reach the shop's server. Check your internet and try again.", 0, 'NETWORK');
+    throw new ApiError(`Can't reach the shop's server (${base}). Check that you're on the same network and try again.`, 0, 'NETWORK');
   } finally {
     clearTimeout(timer);
   }
