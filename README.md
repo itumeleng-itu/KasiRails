@@ -112,7 +112,11 @@ Fund the wallets on Base Sepolia:
   2. `npm run dev:server` (or `npm run start:server` without auto-reload).
   3. Open the till URL the server prints. On a phone, use the LAN address (for example `http://192.168.x.x:3000/vendor/till.html`) so the QR code points somewhere the customer's phone can reach.
   4. The payment sound `apps/server/public/audio/paid.mp3` is a placeholder (empty file). We will record the real clip; until then the till plays a short chime.
-- Customer app: _coming soon_
+- Customer app (Expo SDK 58, runs in Expo Go):
+  1. Copy `apps/customer/.env.example` to `apps/customer/.env` and set `EXPO_PUBLIC_API_URL` to the server's LAN address (for example `http://192.168.x.x:3000`). The phone must be on the same Wi-Fi network.
+  2. `npm run dev:app`, then scan the QR code in the terminal with Expo Go (Android) or the Camera app (iOS).
+  3. On first launch the app creates a key on the phone (stored in secure storage, never sent anywhere). Tap **Receive** to see the code, and fund it with USDC from [faucet.circle.com](https://faucet.circle.com) for testing.
+  4. On the till page charge an amount, then tap **Pay** in the app and scan the till's QR code.
 
 ## Status
 
