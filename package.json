@@ -10,7 +10,8 @@
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
     "gen-wallet": "npm run gen-wallet -w @kasi-rails/server",
-    "setup:wallets": "tsx apps/server/scripts/setup-wallets.ts"
+    "setup:wallets": "tsx apps/server/scripts/setup-wallets.ts",
+    "spike": "tsx apps/server/scripts/spike-eip3009.ts"
   },
   "engines": {
     "node": ">=22"

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "gen-wallet": "tsx scripts/gen-wallet.ts",
+    "spike": "tsx scripts/spike-eip3009.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

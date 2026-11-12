@@ -106,14 +106,14 @@ Fund the wallets on Base Sepolia:
 
 ### Run
 
-- Gasless payment spike: _coming soon_
+- Gasless payment spike: `npm run spike` sends 0.10 USDC from the customer to the shop. The customer signs, the relayer pays the gas, and the script prints the Basescan link and balances. Each order id can be paid once, so use `npm run spike -- --order spike-2` (and so on) to run it again.
 - Server and till page: _coming soon_
 - Customer app: _coming soon_
 
 ## Status
 
 - [x] Milestone 1: scaffold, shared package, wallet tools
-- [ ] Milestone 2: gasless payment spike
+- [x] Milestone 2: gasless payment spike ([first transfer on Base Sepolia](https://sepolia.basescan.org/tx/0xa3805a9eba443c28d0b35bad5bcc02793c19334a1e03d7a992e9e5de56d27b3a))
 - [ ] Milestone 3: server API and till page
 - [ ] Milestone 4: customer app, end to end
 
