@@ -1,0 +1,19 @@
+{
+  "name": "@kasi-rails/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gen-wallet": "tsx scripts/gen-wallet.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@kasi-rails/shared": "*",
+    "viem": "^2.57.19"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "kasi-rails",
+  "private": true,
+  "version": "0.1.0",
+  "description": "USDC payments and cash top-ups for spaza shops on Base Sepolia",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "gen-wallet": "npm run gen-wallet -w @kasi-rails/server"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
