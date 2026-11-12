@@ -7,6 +7,7 @@ import { USDC_DECIMALS, usdcToZarCents, zarCentsToUsdc, type Order, type OrderTy
 import { getUsdcDomain, usdcBalance } from './chain';
 import type { Config } from './config';
 import { HttpError, type Payments } from './payments';
+import { getHistory } from './history';
 import { getRate } from './rate';
 import type { OrderRepo } from './repo';
 import { publicUrl } from './network';
@@ -94,6 +95,27 @@ export function createApp(deps: { config: Config; repo: OrderRepo; payments: Pay
   app.post('/orders/:id/pay', async (req, res) => {
     const { order, confirmed } = await payments.pay(req.params.id, req.body ?? {});
     res.status(confirmed ? 200 : 202).json(withShop(order));
+  });
+
+  // Person-to-person payment (friend to friend), relayed gaslessly.
+  app.post('/transfers', async (req, res) => {
+    const { txHash, confirmed } = await payments.transfer(req.body ?? {});
+    res.status(confirmed ? 200 : 202).json({ txHash, confirmed });
+  });
+
+  app.get('/history/:address', async (req, res) => {
+    if (!isAddress(req.params.address)) throw new HttpError(400, 'Not a valid address.', 'BAD_REQUEST');
+    const rate = await getRate(config.fallbackZarPerUsdc);
+    try {
+      const items = await getHistory(getAddress(req.params.address), {
+        zarPerUsdc: rate.zarPerUsdc,
+        knownShops: { [config.shopAddress]: config.shopName },
+      });
+      res.json({ items, zarPerUsdc: rate.zarPerUsdc });
+    } catch (err) {
+      console.warn('History lookup failed:', err instanceof Error ? err.message : err);
+      throw new HttpError(503, "Couldn't load your history right now. Pull down to try again.", 'HISTORY_UNAVAILABLE');
+    }
   });
 
   app.get('/balance/:address', async (req, res) => {

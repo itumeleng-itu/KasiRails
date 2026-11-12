@@ -76,9 +76,74 @@ function toPaymentError(err: unknown): HttpError {
   return new HttpError(502, 'Could not submit the payment. Please try again.', 'SUBMIT_FAILED');
 }
 
+export interface TransferBody {
+  from?: unknown;
+  to?: unknown;
+  value?: unknown;
+  validAfter?: unknown;
+  validBefore?: unknown;
+  nonce?: unknown;
+  signature?: unknown;
+}
+
+interface Authorization {
+  from: Address;
+  to: Address;
+  value: bigint;
+  validAfter: bigint;
+  validBefore: bigint;
+  nonce: Hex;
+}
+
+/** Max value of one person-to-person transfer, in USDC units (1,000 USDC). */
+const MAX_TRANSFER_UNITS = 1_000_000_000n;
+/** Person-to-person authorizations must expire within this many seconds. */
+const MAX_TRANSFER_VALIDITY_S = 600n;
+
+/** Parses the fields every signed authorization carries. */
+function parseSigned(body: { from?: unknown; signature?: unknown; validAfter?: unknown; validBefore?: unknown }, nowS: bigint) {
+  if (typeof body.from !== 'string' || !isAddress(body.from)) throw new HttpError(400, 'from must be an address.', 'BAD_REQUEST');
+  if (typeof body.signature !== 'string' || !isHex(body.signature) || size(body.signature) !== 65) {
+    throw new HttpError(400, 'signature must be a 65-byte hex string.', 'BAD_REQUEST');
+  }
+  const validAfter = toUint(body.validAfter, 'validAfter');
+  const validBefore = toUint(body.validBefore, 'validBefore');
+  if (validAfter >= nowS) throw new HttpError(400, 'validAfter must be in the past (use 0).', 'BAD_REQUEST');
+  if (validBefore <= nowS) throw new HttpError(409, 'This payment has expired. Please try again.', 'EXPIRED');
+  return { from: getAddress(body.from), signature: body.signature as Hex, validAfter, validBefore };
+}
+
+/** Checks the signature locally, simulates, and submits transferWithAuthorization via the relayer. */
+async function verifyAndSubmit(relayer: Relayer, message: Authorization, signature: Hex, badSignatureMessage: string): Promise<Hex> {
+  const domain = await getUsdcDomain();
+  const valid = await verifyTypedData({
+    address: message.from,
+    domain,
+    types: transferWithAuthorizationTypes,
+    primaryType: 'TransferWithAuthorization',
+    message,
+    signature,
+  }).catch(() => false);
+  if (!valid) throw new HttpError(400, badSignatureMessage, 'BAD_SIGNATURE');
+
+  const { r, s, v, yParity } = parseSignature(signature);
+  try {
+    const { request } = await publicClient.simulateContract({
+      account: relayer.account,
+      address: USDC_ADDRESS,
+      abi: usdcAbi,
+      functionName: 'transferWithAuthorization',
+      args: [message.from, message.to, message.value, message.validAfter, message.validBefore, message.nonce, v !== undefined ? Number(v) : yParity + 27, r, s],
+    });
+    return await relayer.writeContract(request);
+  } catch (err) {
+    throw toPaymentError(err);
+  }
+}
+
 export function createPayments(deps: { repo: OrderRepo; relayer: Relayer; shopAddress: Address }) {
   const { repo, relayer, shopAddress } = deps;
-  /** Orders with a payment being handled by this process. */
+  /** Orders (by id) and transfers (by from:nonce) being handled by this process. */
   const inFlight = new Set<string>();
 
   /**
@@ -101,16 +166,7 @@ export function createPayments(deps: { repo: OrderRepo; relayer: Relayer; shopAd
         throw new HttpError(409, EXPIRED_MESSAGE, 'EXPIRED');
       }
 
-      if (typeof body.from !== 'string' || !isAddress(body.from)) throw new HttpError(400, 'from must be an address.', 'BAD_REQUEST');
-      if (typeof body.signature !== 'string' || !isHex(body.signature) || size(body.signature) !== 65) {
-        throw new HttpError(400, 'signature must be a 65-byte hex string.', 'BAD_REQUEST');
-      }
-      const from = getAddress(body.from);
-      const signature = body.signature as Hex;
-      const validAfter = toUint(body.validAfter, 'validAfter');
-      const validBefore = toUint(body.validBefore, 'validBefore');
-      if (validAfter >= nowS) throw new HttpError(400, 'validAfter must be in the past (use 0).', 'BAD_REQUEST');
-      if (validBefore <= nowS) throw new HttpError(409, EXPIRED_MESSAGE, 'EXPIRED');
+      const { from, signature, validAfter, validBefore } = parseSigned(body, nowS);
       if (validBefore > expiresS + VALID_BEFORE_GRACE_S) {
         throw new HttpError(400, `validBefore must be no later than the order's expiry plus ${VALID_BEFORE_GRACE_S}s.`, 'BAD_REQUEST');
       }
@@ -133,31 +189,7 @@ export function createPayments(deps: { repo: OrderRepo; relayer: Relayer; shopAd
         throw new HttpError(400, 'nonce does not match this order.', 'BAD_REQUEST');
       }
 
-      const domain = await getUsdcDomain();
-      const valid = await verifyTypedData({
-        address: from,
-        domain,
-        types: transferWithAuthorizationTypes,
-        primaryType: 'TransferWithAuthorization',
-        message,
-        signature,
-      }).catch(() => false);
-      if (!valid) throw new HttpError(400, 'The payment signature is not valid for this order.', 'BAD_SIGNATURE');
-
-      const { r, s, v, yParity } = parseSignature(signature);
-      let hash: Hex;
-      try {
-        const { request } = await publicClient.simulateContract({
-          account: relayer.account,
-          address: USDC_ADDRESS,
-          abi: usdcAbi,
-          functionName: 'transferWithAuthorization',
-          args: [from, shopAddress, message.value, validAfter, validBefore, message.nonce, v !== undefined ? Number(v) : yParity + 27, r, s],
-        });
-        hash = await relayer.writeContract(request);
-      } catch (err) {
-        throw toPaymentError(err);
-      }
+      const hash = await verifyAndSubmit(relayer, message, signature, 'The payment signature is not valid for this order.');
 
       // Record the tx straight away so a restart or timeout can still reconcile it.
       const submitted = (await repo.transition(order.id, ['PENDING', 'EXPIRED'], { payer: from, txHash: hash })) ?? order;
@@ -177,6 +209,44 @@ export function createPayments(deps: { repo: OrderRepo; relayer: Relayer; shopAd
       return { order: paid ?? (await repo.get(order.id)) ?? submitted, confirmed: true };
     } finally {
       inFlight.delete(orderId);
+    }
+  }
+
+  /** Person-to-person payment: any signed authorization, relayed gaslessly. */
+  async function transfer(body: TransferBody): Promise<{ txHash: Hex; confirmed: boolean }> {
+    const nowS = BigInt(Math.floor(Date.now() / 1000));
+    const { from, signature, validAfter, validBefore } = parseSigned(body, nowS);
+    if (validBefore > nowS + MAX_TRANSFER_VALIDITY_S) {
+      throw new HttpError(400, `validBefore must be within ${MAX_TRANSFER_VALIDITY_S}s from now.`, 'BAD_REQUEST');
+    }
+    if (typeof body.to !== 'string' || !isAddress(body.to)) throw new HttpError(400, 'to must be an address.', 'BAD_REQUEST');
+    const to = getAddress(body.to);
+    if (to === from) throw new HttpError(400, "You can't send money to yourself.", 'BAD_REQUEST');
+    const value = toUint(body.value, 'value');
+    if (value === 0n) throw new HttpError(400, 'Amount must be more than 0.', 'BAD_REQUEST');
+    if (value > MAX_TRANSFER_UNITS) throw new HttpError(400, 'Amount is above the limit for one payment.', 'BAD_REQUEST');
+    if (typeof body.nonce !== 'string' || !isHex(body.nonce) || size(body.nonce) !== 32) {
+      throw new HttpError(400, 'nonce must be a 32-byte hex string.', 'BAD_REQUEST');
+    }
+    const nonce = body.nonce.toLowerCase() as Hex;
+
+    const key = `${from}:${nonce}`;
+    if (inFlight.has(key)) throw new HttpError(409, 'This payment is already being processed.', 'IN_PROGRESS');
+    inFlight.add(key);
+    try {
+      const hash = await verifyAndSubmit(relayer, { from, to, value, validAfter, validBefore, nonce }, signature, 'The payment signature is not valid.');
+      let receipt;
+      try {
+        receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: RECEIPT_TIMEOUT_MS });
+      } catch {
+        return { txHash: hash, confirmed: false };
+      }
+      if (receipt.status !== 'success') {
+        throw new HttpError(502, 'The payment failed on the network. Nothing was taken; please try again.', 'TX_REVERTED');
+      }
+      return { txHash: hash, confirmed: true };
+    } finally {
+      inFlight.delete(key);
     }
   }
 
@@ -212,7 +282,7 @@ export function createPayments(deps: { repo: OrderRepo; relayer: Relayer; shopAd
     }
   }
 
-  return { pay, sweep };
+  return { pay, transfer, sweep };
 }
 
 export type Payments = ReturnType<typeof createPayments>;

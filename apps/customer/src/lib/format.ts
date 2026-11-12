@@ -10,3 +10,18 @@ export function formatDollars(units: string | bigint): string {
   const cents = BigInt(units) / 10_000n;
   return `US$${cents / 100n}.${String(cents % 100n).padStart(2, '0')}`;
 }
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "12 Nov, 21:36" in the phone's local time. */
+export function formatWhen(iso: string): string {
+  const d = new Date(iso);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}, ${hh}:${mm}`;
+}
+
+/** "0x8CBA…b901" */
+export function shortCode(address: string): string {
+  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}

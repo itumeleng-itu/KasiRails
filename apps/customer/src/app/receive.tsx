@@ -24,9 +24,12 @@ export default function Receive() {
         {address ? <QRCode value={address} size={260} quietZone={12} /> : <ActivityIndicator size="large" color={colors.fg} />}
       </View>
       {address ? (
-        <Text style={styles.code} selectable>
-          {address.slice(0, 6)}…{address.slice(-4)}
-        </Text>
+        <View style={styles.codeBox}>
+          <Text style={styles.code} selectable>
+            {address}
+          </Text>
+          <Text style={styles.codeHint}>Press and hold to copy</Text>
+        </View>
       ) : null}
     </View>
   );
@@ -36,5 +39,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 24 },
   title: { fontSize: 26, fontWeight: '800', color: colors.fg, textAlign: 'center' },
   qr: { width: 284, height: 284, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderRadius: 16 },
-  code: { fontSize: 18, color: colors.muted, fontVariant: ['tabular-nums'] },
+  codeBox: { alignItems: 'center', gap: 4 },
+  code: { fontSize: 15, color: colors.fg, textAlign: 'center' },
+  codeHint: { fontSize: 13, color: colors.muted },
 });

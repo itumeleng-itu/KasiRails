@@ -3,17 +3,23 @@ import { ActivityIndicator, Linking, StyleSheet, Text, View } from 'react-native
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { router } from 'expo-router';
 
+import type { Hex } from 'viem';
+
+import { Success } from '@/components/success';
 import { BigButton, Message, colors } from '@/components/ui';
-import { ApiError, getBalance, getOrder, getUsdcDomain, parseTillQr, payOrder, type ShopOrder } from '@/lib/api';
-import { formatRand } from '@/lib/format';
-import { getAddress, signPayment } from '@/lib/wallet';
+import { API_URL, ApiError, getBalance, getOrder, getUsdcDomain, parseScan, payOrder, sendTransfer, type ShopOrder } from '@/lib/api';
+import { formatRand, shortCode } from '@/lib/format';
+import { findFriend, listFriends } from '@/lib/friends';
+import { getAddress, signPayment, signTransfer } from '@/lib/wallet';
 
 type Step =
   | { kind: 'scan' }
   | { kind: 'loading' }
   | { kind: 'confirm'; order: ShopOrder; api: string; balanceZarCents: number | null; enough: boolean }
   | { kind: 'paying'; order: ShopOrder; api: string }
-  | { kind: 'done'; order: ShopOrder; confirmed: boolean }
+  | { kind: 'friend'; to: Hex; name: string; usdcAmount: bigint; zarCents: number; balanceZarCents: number | null; enough: boolean; sending: boolean }
+  | { kind: 'done'; zarCents: number; message: string }
+  | { kind: 'someone'; address: Hex }
   | { kind: 'error'; title: string; body: string };
 
 const EXPIRED = { title: 'Too late', body: 'This payment request has expired. Ask the shop to charge again.' };
@@ -56,13 +62,32 @@ export default function Pay() {
     if (handling.current) return;
     handling.current = true;
 
-    const qr = parseTillQr(data);
+    const qr = parseScan(data);
     if (!qr) {
-      setStep({ kind: 'error', title: "That's not a shop payment code", body: "Scan the code on the shop's till." });
+      setStep({ kind: 'error', title: "That's not a payment code", body: "Scan the code on the shop's till, or a friend's payment request." });
+      return;
+    }
+    if (qr.kind === 'address') {
+      setStep({ kind: 'someone', address: qr.address });
       return;
     }
 
     setStep({ kind: 'loading' });
+    if (qr.kind === 'request') {
+      try {
+        const [friends, balance] = await Promise.all([listFriends(), getAddress().then((a) => getBalance(a)).catch(() => null)]);
+        if (qr.to.toLowerCase() === (await getAddress()).toLowerCase()) {
+          return setStep({ kind: 'error', title: "That's your own request", body: 'Show it to your friend so they can pay you.' });
+        }
+        const name = findFriend(friends, qr.to)?.name ?? shortCode(qr.to);
+        const enough = balance ? BigInt(balance.usdcAmount) >= qr.usdcAmount : true;
+        setStep({ kind: 'friend', to: qr.to, name, usdcAmount: qr.usdcAmount, zarCents: qr.zarCents, balanceZarCents: balance?.zarCents ?? null, enough, sending: false });
+      } catch (err) {
+        setStep({ kind: 'error', ...errorFor(err) });
+      }
+      return;
+    }
+
     try {
       const [o, balance] = await Promise.all([
         getOrder(qr.api, qr.orderId),
@@ -91,7 +116,25 @@ export default function Pay() {
         domain,
       });
       const result = await payOrder(api, o.id, auth);
-      setStep({ kind: 'done', order: result.order, confirmed: result.confirmed });
+      setStep({
+        kind: 'done',
+        zarCents: result.order.zarCents,
+        message: result.confirmed ? `Paid to ${result.order.shopName}` : `Sent to ${result.order.shopName}. The shop will see it in a moment.`,
+      });
+    } catch (err) {
+      setStep({ kind: 'error', ...errorFor(err) });
+    }
+  };
+
+  const onPayFriend = async () => {
+    if (step.kind !== 'friend' || step.sending) return;
+    const current = step;
+    setStep({ ...current, sending: true });
+    try {
+      const domain = await getUsdcDomain(API_URL);
+      const auth = await signTransfer({ to: current.to, value: current.usdcAmount, domain });
+      const { confirmed } = await sendTransfer(auth);
+      setStep({ kind: 'done', zarCents: current.zarCents, message: confirmed ? `Sent to ${current.name}` : `Sent to ${current.name}. It will arrive in a moment.` });
     } catch (err) {
       setStep({ kind: 'error', ...errorFor(err) });
     }
@@ -151,17 +194,39 @@ export default function Pay() {
     );
   }
 
-  if (step.kind === 'done') {
+  if (step.kind === 'friend') {
     return (
-      <View style={[styles.flex, styles.success]}>
-        <Text style={styles.tick}>✓</Text>
-        <Text style={styles.successAmount} adjustsFontSizeToFit numberOfLines={1}>{formatRand(step.order.zarCents)}</Text>
-        <Text style={styles.successText}>
-          {step.confirmed ? `Paid to ${step.order.shopName}` : `Sent to ${step.order.shopName}. The shop will see it in a moment.`}
-        </Text>
-        <BigButton label="Done" variant="secondary" onPress={() => router.back()} style={styles.wide} />
-      </View>
+      <Centered>
+        <Text style={styles.question}>Pay</Text>
+        <Text style={styles.amount} adjustsFontSizeToFit numberOfLines={1}>{formatRand(step.zarCents)}</Text>
+        <Text style={styles.question}>to {step.name}?</Text>
+        {step.balanceZarCents !== null ? (
+          <Text style={[styles.muted, !step.enough && { color: colors.danger }]}>
+            {step.enough ? `You have ${formatRand(step.balanceZarCents)}` : `Not enough money. You have ${formatRand(step.balanceZarCents)}.`}
+          </Text>
+        ) : null}
+        <View style={styles.buttons}>
+          <BigButton label={step.sending ? 'Paying…' : 'Pay'} onPress={onPayFriend} busy={step.sending} disabled={!step.enough} />
+          {!step.sending ? <BigButton label="Cancel" variant="secondary" onPress={() => router.back()} /> : null}
+        </View>
+      </Centered>
     );
+  }
+
+  if (step.kind === 'someone') {
+    return (
+      <Centered>
+        <Message title="That's someone's Receive code" body="To send them money, add them as a friend first." />
+        <View style={styles.buttons}>
+          <BigButton label="Add as a friend" onPress={() => router.replace({ pathname: '/add-friend', params: { address: step.address } })} />
+          <BigButton label="Scan again" variant="secondary" onPress={rescan} />
+        </View>
+      </Centered>
+    );
+  }
+
+  if (step.kind === 'done') {
+    return <Success zarCents={step.zarCents} message={step.message} onDone={() => router.back()} />;
   }
 
   return (
@@ -198,8 +263,4 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
-  success: { backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
-  tick: { fontSize: 140, fontWeight: '900', color: '#FFFFFF', lineHeight: 160 },
-  successAmount: { fontSize: 64, fontWeight: '900', color: '#FFFFFF' },
-  successText: { fontSize: 24, fontWeight: '700', color: '#FFFFFF', textAlign: 'center', marginBottom: 16 },
 });
