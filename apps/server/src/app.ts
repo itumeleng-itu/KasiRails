@@ -10,7 +10,9 @@ import { HttpError, type Payments } from './payments';
 import { getHistory } from './history';
 import { getRate } from './rate';
 import type { OrderRepo } from './repo';
+import { createRequire } from 'node:module';
 import { publicUrl } from './network';
+import type { TopUps } from './topups';
 import { ROOT_DIR } from './paths';
 
 const PUBLIC_DIR = resolve(ROOT_DIR, 'apps/server/public');
@@ -34,8 +36,8 @@ function parseZarCents(zar: unknown): number {
   return cents;
 }
 
-export function createApp(deps: { config: Config; repo: OrderRepo; payments: Payments }) {
-  const { config, repo, payments } = deps;
+export function createApp(deps: { config: Config; repo: OrderRepo; payments: Payments; topUps: TopUps }) {
+  const { config, repo, payments, topUps } = deps;
   const app = express();
   app.disable('x-powered-by');
   // Behind one proxy when hosted (e.g. Railway), so req.ip is the caller's address.
@@ -145,6 +147,35 @@ export function createApp(deps: { config: Config; repo: OrderRepo; payments: Pay
   });
 
   // Vendor pages. The QR is drawn server-side as SVG; the page decides its content.
+  // ---- Shop owner: cash top-ups (PIN in the x-owner-pin header)
+  app.post('/owner/check-pin', (req, res) => {
+    topUps.checkPin(req.get('x-owner-pin'));
+    res.json({ ok: true });
+  });
+
+  app.get('/float', async (_req, res) => {
+    res.json({ ...(await topUps.getFloat()), shopName: config.shopName, shopAddress: config.shopAddress });
+  });
+
+  app.post('/topups', async (req, res) => {
+    topUps.checkPin(req.get('x-owner-pin'));
+    const zarCents = parseZarCents(req.body?.zar);
+    const result = await topUps.topUp(zarCents, req.body?.customerAddress);
+    res.status(result.confirmed ? 201 : 202).json(result);
+  });
+
+  app.get('/topups', async (req, res) => {
+    topUps.checkPin(req.get('x-owner-pin'));
+    if (req.query.day !== 'today') throw new HttpError(400, 'Use ?day=today.', 'BAD_REQUEST');
+    res.json({ topUps: await repo.listTopUpsSince(startOfTodaySast()) });
+  });
+
+  // Browser build of the QR scanner used by the top-up page.
+  const html5QrcodePath = createRequire(import.meta.url).resolve('html5-qrcode/html5-qrcode.min.js');
+  app.get('/vendor/lib/html5-qrcode.min.js', (_req, res) => {
+    res.type('application/javascript').sendFile(html5QrcodePath);
+  });
+
   app.get('/vendor/qr.svg', async (req, res) => {
     const data = req.query.data;
     if (typeof data !== 'string' || !data || data.length > 512) throw new HttpError(400, 'data is required (max 512 chars).', 'BAD_REQUEST');

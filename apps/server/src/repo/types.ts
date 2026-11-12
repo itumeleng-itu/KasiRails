@@ -1,4 +1,4 @@
-import type { Order, OrderStatus } from '@kasi-rails/shared';
+import type { Order, OrderStatus, TopUp } from '@kasi-rails/shared';
 
 /** Fields that change after creation. `null` clears an optional field. */
 export interface OrderPatch {
@@ -22,4 +22,7 @@ export interface OrderRepo {
   expireDue(now: Date): Promise<Order[]>;
   /** PENDING orders with a submitted tx that hasn't been confirmed yet. */
   listSubmitted(): Promise<Order[]>;
+  createTopUp(topUp: TopUp): Promise<void>;
+  /** Top-ups created at or after `since`, newest first. */
+  listTopUpsSince(since: Date): Promise<TopUp[]>;
 }

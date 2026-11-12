@@ -6,6 +6,7 @@ export interface Config {
   port: number;
   shopName: string;
   shopAddress: Address;
+  shopKey: Hex;
   relayerKey: Hex;
   orderTtlSeconds: number;
   fallbackZarPerUsdc: number;
@@ -46,6 +47,7 @@ export function loadConfig(): Config {
     port,
     shopName: process.env.SHOP_NAME?.trim() || "Mama Thoko's Spaza",
     shopAddress: privateKeyToAccount(requirePrivateKey('SHOP_PRIVATE_KEY')).address,
+    shopKey: requirePrivateKey('SHOP_PRIVATE_KEY'),
     relayerKey: requirePrivateKey('RELAYER_PRIVATE_KEY'),
     orderTtlSeconds: num('ORDER_TTL_SECONDS', 60, (n) => Number.isInteger(n) && n >= 10),
     fallbackZarPerUsdc: num('FALLBACK_ZAR_PER_USDC', 18.5, (n) => Number.isFinite(n) && n > 0),

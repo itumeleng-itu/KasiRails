@@ -14,6 +14,7 @@
     "@kasi-rails/shared": "*",
     "@supabase/supabase-js": "^2.119.0",
     "express": "^5.3.0",
+    "html5-qrcode": "^2.3.8",
     "qrcode": "^1.5.4",
     "tsx": "^4.23.15",
     "viem": "^2.57.19"

@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Order, OrderStatus, OrderType } from '@kasi-rails/shared';
+import type { Order, OrderStatus, OrderType, TopUp } from '@kasi-rails/shared';
 import type { OrderPatch, OrderRepo } from './types';
 
 interface OrderRow {
@@ -13,6 +13,16 @@ interface OrderRow {
   refund_tx_hash: string | null;
   created_at: string;
   expires_at: string;
+}
+
+interface TopUpRow {
+  id: string;
+  zar_cents: number;
+  fee_zar_cents: number;
+  usdc_amount: number | string;
+  customer_address: string;
+  tx_hash: string;
+  created_at: string;
 }
 
 const toIso = (ts: string) => new Date(ts).toISOString();
@@ -125,4 +135,34 @@ export class SupabaseOrderRepo implements OrderRepo {
     );
     return (rows ?? []).map(fromRow);
   }
+
+  async createTopUp(t: TopUp) {
+    const row: TopUpRow = {
+      id: t.id,
+      zar_cents: t.zarCents,
+      fee_zar_cents: t.feeZarCents,
+      usdc_amount: t.usdcAmount,
+      customer_address: t.customerAddress,
+      tx_hash: t.txHash,
+      created_at: t.createdAt,
+    };
+    unwrap(await this.db.from('topups').insert(row), 'insert top-up');
+  }
+
+  async listTopUpsSince(since: Date) {
+    const rows = unwrap(
+      await this.db.from('topups').select('*').gte('created_at', since.toISOString()).order('created_at', { ascending: false }).returns<TopUpRow[]>(),
+      'list top-ups',
+    );
+    return (rows ?? []).map((r) => ({
+      id: r.id,
+      zarCents: r.zar_cents,
+      feeZarCents: r.fee_zar_cents,
+      usdcAmount: String(r.usdc_amount),
+      customerAddress: r.customer_address,
+      txHash: r.tx_hash,
+      createdAt: toIso(r.created_at),
+    }));
+  }
 }
+

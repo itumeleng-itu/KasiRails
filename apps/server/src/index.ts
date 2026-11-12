@@ -5,6 +5,7 @@ import { loadConfig } from './config';
 import { createPayments } from './payments';
 import { lanAddresses, publicUrl } from './network';
 import { createOrderRepo } from './repo';
+import { createTopUps } from './topups';
 
 const SWEEP_INTERVAL_MS = 5_000;
 
@@ -15,7 +16,15 @@ async function main() {
 
   const relayer = createRelayer(config.relayerKey);
   const payments = createPayments({ repo, relayer, shopAddress: config.shopAddress });
-  const app = createApp({ config, repo, payments });
+  const topUps = createTopUps({
+    repo,
+    relayer,
+    shopKey: config.shopKey,
+    feeBps: config.topupFeeBps,
+    ownerPin: config.ownerPin,
+    fallbackZarPerUsdc: config.fallbackZarPerUsdc,
+  });
+  const app = createApp({ config, repo, payments, topUps });
 
   let sweeping = false;
   setInterval(async () => {

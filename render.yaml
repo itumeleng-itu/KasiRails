@@ -19,6 +19,9 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      # PIN for the shop owner's pages (cash top-ups). Choose your own; never use 1234 on a public server.
+      - key: OWNER_PIN
+        sync: false
       - key: SHOP_NAME
         value: "Mama Thoko's Spaza"
       - key: ORDER_TTL_SECONDS

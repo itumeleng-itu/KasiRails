@@ -1,4 +1,4 @@
-import type { Order, OrderStatus } from '@kasi-rails/shared';
+import type { Order, OrderStatus, TopUp } from '@kasi-rails/shared';
 import type { OrderPatch, OrderRepo } from './types';
 
 function applyPatch(order: Order, patch: OrderPatch): Order {
@@ -16,6 +16,7 @@ function applyPatch(order: Order, patch: OrderPatch): Order {
 export class MemoryOrderRepo implements OrderRepo {
   readonly kind = 'memory';
   private orders = new Map<string, Order>();
+  private topUps: TopUp[] = [];
 
   async check() {}
 
@@ -58,5 +59,16 @@ export class MemoryOrderRepo implements OrderRepo {
 
   async listSubmitted() {
     return [...this.orders.values()].filter((o) => o.status === 'PENDING' && o.txHash).map((o) => ({ ...o }));
+  }
+
+  async createTopUp(topUp: TopUp) {
+    this.topUps.push({ ...topUp });
+  }
+
+  async listTopUpsSince(since: Date) {
+    return this.topUps
+      .filter((t) => Date.parse(t.createdAt) >= since.getTime())
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+      .map((t) => ({ ...t }));
   }
 }

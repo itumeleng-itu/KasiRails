@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#111111">
+  <title>Kasi Rails Top-up</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Owner PIN -->
+  <main id="screen-pin" class="screen" hidden>
+    <header class="bar">
+      <span class="shop shop-name">Kasi Rails</span>
+      <a class="navlink" href="till.html">Till</a>
+    </header>
+    <div class="sub">Top-up · enter PIN</div>
+    <div class="amount pin-dots" id="pin-dots" aria-live="polite">····</div>
+    <div class="keypad" id="pin-keypad" role="group" aria-label="PIN keypad">
+      <button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button>
+      <button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button>
+      <button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button>
+      <button data-key="clear" aria-label="Clear">C</button><button data-key="0">0</button><button data-key="back" aria-label="Delete">&#9003;</button>
+    </div>
+    <p id="pin-error" class="error" role="alert"></p>
+    <button id="pin-ok" class="primary" disabled>Unlock</button>
+  </main>
+
+  <!-- Scan the customer's Receive code -->
+  <main id="screen-scan" class="screen" hidden>
+    <header class="bar">
+      <span class="shop shop-name">Kasi Rails</span>
+      <a class="navlink" href="till.html">Till</a>
+    </header>
+    <div class="float muted" id="float">Float: …</div>
+    <div class="sub">Scan the customer's Receive code</div>
+    <div id="reader" class="reader"></div>
+    <p id="scan-error" class="error" role="alert"></p>
+    <div class="type-code">
+      <input id="code-input" class="text-input" placeholder="or type their code: 0x…" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button id="code-ok" class="secondary small">Use code</button>
+    </div>
+  </main>
+
+  <!-- Enter the cash amount -->
+  <main id="screen-amount" class="screen" hidden>
+    <header class="bar">
+      <span class="muted" id="customer-code"></span>
+      <a class="navlink" href="#" id="change-customer">Change</a>
+    </header>
+    <div class="sub">Cash received</div>
+    <div class="amount" aria-live="polite"><span class="currency">R</span><span id="amount">0</span></div>
+    <div class="breakdown muted" id="breakdown">&nbsp;</div>
+    <div class="keypad" id="amount-keypad" role="group" aria-label="Amount keypad">
+      <button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button>
+      <button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button>
+      <button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button>
+      <button data-key=".">.</button><button data-key="0">0</button><button data-key="back" aria-label="Delete">&#9003;</button>
+    </div>
+    <p id="amount-error" class="error" role="alert"></p>
+    <button id="send" class="primary" disabled>Send top-up</button>
+  </main>
+
+  <!-- Sent -->
+  <main id="screen-done" class="screen result paid" hidden>
+    <div class="big">SENT</div>
+    <div id="done-net" class="amount"></div>
+    <div id="done-detail" class="sub"></div>
+    <a id="done-tx" class="txlink" target="_blank" rel="noopener">View payment</a>
+    <button id="next" class="secondary">Next customer</button>
+  </main>
+
+  <script src="lib/html5-qrcode.min.js"></script>
+  <script src="topup.js"></script>
+</body>
+</html>

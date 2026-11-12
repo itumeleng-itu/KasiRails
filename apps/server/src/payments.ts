@@ -114,7 +114,7 @@ function parseSigned(body: { from?: unknown; signature?: unknown; validAfter?: u
 }
 
 /** Checks the signature locally, simulates, and submits transferWithAuthorization via the relayer. */
-async function verifyAndSubmit(relayer: Relayer, message: Authorization, signature: Hex, badSignatureMessage: string): Promise<Hex> {
+export async function verifyAndSubmit(relayer: Relayer, message: Authorization, signature: Hex, badSignatureMessage: string): Promise<Hex> {
   const domain = await getUsdcDomain();
   const valid = await verifyTypedData({
     address: message.from,

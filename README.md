@@ -106,6 +106,7 @@ Fund the wallets on Base Sepolia:
 
 ### Run
 
+- Cash top-up (shop sells USDC for cash): open `/vendor/topup.html` (or **Top up** on the till), enter the `OWNER_PIN`, scan the customer's **Receive** code (camera needs https, so use the hosted server, or type the code), and enter the cash received. The customer gets USDC from the shop's float, minus `TOPUP_FEE_BPS` (2% by default); the shop signs and the relayer pays gas. Top-ups are saved in the `topups` table.
 - Gasless payment spike: `npm run spike` sends 0.10 USDC from the customer to the shop. The customer signs, the relayer pays the gas, and the script prints the Basescan link and balances. Each order id can be paid once, so use `npm run spike -- --order spike-2` (and so on) to run it again.
 - Server and till page:
   1. Optional: to use Supabase, set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (the project's secret key) in `.env`, and run `apps/server/supabase/schema.sql` once in the Supabase SQL Editor. Leave `SUPABASE_URL` empty to use the in-memory store.
@@ -123,7 +124,7 @@ Fund the wallets on Base Sepolia:
 The repo has a `Dockerfile` that installs only the server and the shared package, and a `render.yaml` Blueprint.
 
 1. In Render, choose **New → Blueprint** and connect this GitHub repo. Render reads `render.yaml` (Docker web service, free plan, branch `dev`, health check `/health`).
-2. When asked, paste the secret values from your `.env`: `SHOP_PRIVATE_KEY`, `RELAYER_PRIVATE_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. Don't add `CUSTOMER_PRIVATE_KEY` or the database connection string.
+2. When asked, paste the secret values from your `.env`: `SHOP_PRIVATE_KEY`, `RELAYER_PRIVATE_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and choose an `OWNER_PIN` for the top-up page (don't leave the default `1234` on a public server). Don't add `CUSTOMER_PRIVATE_KEY` or the database connection string.
 3. Deploy. The server uses `RENDER_EXTERNAL_URL` (e.g. `https://kasi-rails.onrender.com`) in till QR codes; set `PUBLIC_URL` to override.
 4. Point the app at it: set `EXPO_PUBLIC_API_URL=https://<your-service>.onrender.com` in `apps/customer/.env` and reload the app.
 
