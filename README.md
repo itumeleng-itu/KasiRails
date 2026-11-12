@@ -33,11 +33,15 @@ Requires Node 22+.
 npm install
 npm run typecheck
 
-# Create wallets (shop + relayer); copy the keys into .env
-npm run gen-wallet
-cp .env.example .env
+# Create .env (from .env.example) and fill in shop, relayer and customer keys.
+# Existing valid keys are kept; keys are never printed.
+npm run setup:wallets
+npm run setup:wallets -- --show    # print addresses only
+npm run setup:wallets -- --force   # regenerate all three
 ```
 
-Fund the wallets on Base Sepolia: the relayer needs ETH for gas; USDC comes from https://faucet.circle.com.
+Fund the wallets on Base Sepolia (the script prints the addresses):
+- USDC from https://faucet.circle.com → shop and customer
+- ETH from https://portal.cdp.coinbase.com → Faucets → relayer (gas) and shop
 
 _More steps added per milestone._

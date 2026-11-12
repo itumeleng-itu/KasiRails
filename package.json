@@ -9,9 +9,13 @@
   ],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "gen-wallet": "npm run gen-wallet -w @kasi-rails/server"
+    "gen-wallet": "npm run gen-wallet -w @kasi-rails/server",
+    "setup:wallets": "tsx apps/server/scripts/setup-wallets.ts"
   },
   "engines": {
     "node": ">=22"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }
