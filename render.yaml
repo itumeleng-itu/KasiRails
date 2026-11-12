@@ -1,0 +1,29 @@
+# Render Blueprint: Kasi Rails API server + vendor pages.
+# Secrets use `sync: false`, so Render asks for their values when the Blueprint is created.
+services:
+  - type: web
+    name: kasi-rails
+    runtime: docker
+    plan: free
+    branch: dev
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: SHOP_PRIVATE_KEY
+        sync: false
+      - key: RELAYER_PRIVATE_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SHOP_NAME
+        value: "Mama Thoko's Spaza"
+      - key: ORDER_TTL_SECONDS
+        value: "60"
+      - key: FALLBACK_ZAR_PER_USDC
+        value: "18.50"
+      - key: TOPUP_FEE_BPS
+        value: "200"

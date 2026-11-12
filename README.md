@@ -118,17 +118,18 @@ Fund the wallets on Base Sepolia:
   3. On first launch the app creates a key on the phone (stored in secure storage, never sent anywhere). Tap **Receive** to see the code, and fund it with USDC from [faucet.circle.com](https://faucet.circle.com) for testing.
   4. On the till page charge an amount, then tap **Pay** in the app and scan the till's QR code.
 
-### Deploy the server (Railway)
+### Deploy the server (Render)
 
-The repo has a `Dockerfile` that installs only the server and the shared package. Railway builds from it automatically.
+The repo has a `Dockerfile` that installs only the server and the shared package, and a `render.yaml` Blueprint.
 
-1. In Railway, create a project from this GitHub repo (choose the branch to deploy).
-2. Under **Variables**, add: `SHOP_PRIVATE_KEY`, `RELAYER_PRIVATE_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SHOP_NAME`, and optionally `ORDER_TTL_SECONDS`, `FALLBACK_ZAR_PER_USDC`, `TOPUP_FEE_BPS`, `OWNER_PIN`. Don't add `CUSTOMER_PRIVATE_KEY` or the database connection string; the server doesn't need them.
-3. Under **Settings → Networking**, generate a public domain. The server uses `RAILWAY_PUBLIC_DOMAIN` for till QR codes (set `PUBLIC_URL` to override).
-4. Optional: set the health check path to `/health`.
-5. Point the app at it: set `EXPO_PUBLIC_API_URL=https://<your-domain>` in `apps/customer/.env` and reload the app.
+1. In Render, choose **New → Blueprint** and connect this GitHub repo. Render reads `render.yaml` (Docker web service, free plan, branch `dev`, health check `/health`).
+2. When asked, paste the secret values from your `.env`: `SHOP_PRIVATE_KEY`, `RELAYER_PRIVATE_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. Don't add `CUSTOMER_PRIVATE_KEY` or the database connection string.
+3. Deploy. The server uses `RENDER_EXTERNAL_URL` (e.g. `https://kasi-rails.onrender.com`) in till QR codes; set `PUBLIC_URL` to override.
+4. Point the app at it: set `EXPO_PUBLIC_API_URL=https://<your-service>.onrender.com` in `apps/customer/.env` and reload the app.
 
-Run a single instance, and stop any local server that uses the same relayer key and database, so two servers don't sweep orders or send relayer transactions at the same time.
+Free Render services sleep after 15 minutes without traffic and take about a minute to wake. Before a demo, open `/health` to wake it, or ping it every 10 minutes with an uptime monitor. Run a single instance, and stop any local server that uses the same relayer key and database.
+
+The same `Dockerfile` also works on Railway or any Docker host (Railway's `RAILWAY_PUBLIC_DOMAIN` is supported too).
 
 ## Status
 
