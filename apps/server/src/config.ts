@@ -33,7 +33,9 @@ export function loadConfig(): Config {
   }
 
   const port = num('PORT', 3000, (n) => Number.isInteger(n) && n > 0 && n < 65536);
-  const configuredUrl = process.env.PUBLIC_URL?.trim();
+  // On Railway, RAILWAY_PUBLIC_DOMAIN is the service's public hostname (no scheme).
+  const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN?.trim();
+  const configuredUrl = process.env.PUBLIC_URL?.trim() || (railwayDomain ? `https://${railwayDomain}` : undefined);
   if (configuredUrl && !/^https?:\/\/[^/]+/.test(configuredUrl)) throw new Error(`PUBLIC_URL must start with http:// or https:// (got "${configuredUrl}").`);
 
   return {

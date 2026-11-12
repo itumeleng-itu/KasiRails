@@ -38,6 +38,8 @@ export function createApp(deps: { config: Config; repo: OrderRepo; payments: Pay
   const { config, repo, payments } = deps;
   const app = express();
   app.disable('x-powered-by');
+  // Behind one proxy when hosted (e.g. Railway), so req.ip is the caller's address.
+  app.set('trust proxy', 1);
   app.use(express.json({ limit: '10kb' }));
 
   // One line per API request (method, path, status, time, caller IP); vendor page assets are skipped.
