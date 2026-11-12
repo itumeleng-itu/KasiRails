@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import type { Order } from '@kasi-rails/shared';
 import { getAddress, isAddress, type Hex } from 'viem';
-import type { FriendTransfer, TransferAuthorization, UsdcDomain } from './wallet';
+import type { TransferAuthorization, UsdcDomain } from './wallet';
 
 const SERVER_PORT = 3000;
 
@@ -100,29 +100,9 @@ export async function getRate(api = API_URL): Promise<{ zarPerUsdc: number; sour
   return (await request<{ zarPerUsdc: number; source: 'valr' | 'fallback' }>(api, '/rate')).body;
 }
 
-/** Sends a signed payment to a friend through the relayer. */
-export async function sendTransfer(auth: FriendTransfer, api = API_URL): Promise<{ txHash: string; confirmed: boolean }> {
-  return (
-    await request<{ txHash: string; confirmed: boolean }>(
-      api,
-      '/transfers',
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(auth) },
-      PAY_TIMEOUT_MS,
-    )
-  ).body;
-}
+export type Scan = { kind: 'order'; orderId: string; api: string } | { kind: 'address'; address: Hex };
 
-/** A request QR: {"kasiRails":1,"request":{"to":"0x…","usdc":"2963000","zar":5000}}. */
-export function requestQrData(to: string, usdcAmount: bigint, zarCents: number): string {
-  return JSON.stringify({ kasiRails: 1, request: { to, usdc: usdcAmount.toString(), zar: zarCents } });
-}
-
-export type Scan =
-  | { kind: 'order'; orderId: string; api: string }
-  | { kind: 'request'; to: Hex; usdcAmount: bigint; zarCents: number }
-  | { kind: 'address'; address: Hex };
-
-/** Recognises a till QR, a friend's payment request, or a plain Receive code. */
+/** Recognises a till QR or a plain Receive code. */
 export function parseScan(data: string): Scan | null {
   const text = data.trim();
   const plain = text.replace(/^ethereum:/i, '').split(/[@?]/)[0];
@@ -135,10 +115,6 @@ export function parseScan(data: string): Scan | null {
       // "localhost" in the QR means the till's computer, which this phone can't reach by that name.
       if (/^https?:\/\/(localhost|127\.|\[::1\])/i.test(api) && API_URL) api = API_URL;
       return { kind: 'order', orderId: parsed.orderId, api };
-    }
-    const r = parsed.request;
-    if (r && typeof r.to === 'string' && isAddress(r.to) && /^\d+$/.test(String(r.usdc)) && Number.isSafeInteger(r.zar) && BigInt(r.usdc) > 0n) {
-      return { kind: 'request', to: getAddress(r.to), usdcAmount: BigInt(r.usdc), zarCents: r.zar };
     }
   } catch {
     // not JSON

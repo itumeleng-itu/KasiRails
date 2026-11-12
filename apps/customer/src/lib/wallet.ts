@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { generatePrivateKey, privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
-import { toHex, type Hex } from 'viem';
+import type { Hex } from 'viem';
 import { CHAIN_ID, USDC_ADDRESS, orderIdToNonce, transferWithAuthorizationTypes } from '@kasi-rails/shared';
 
 // The private key lives only in the device's secure storage and never leaves this module's account object.
@@ -56,23 +56,6 @@ export async function signPayment(params: {
   domain: UsdcDomain;
 }): Promise<TransferAuthorization> {
   return sign({ to: params.to, value: params.value, validBefore: params.validBefore, nonce: orderIdToNonce(params.orderId), domain: params.domain });
-}
-
-/** How long a payment to a friend stays valid after signing. */
-const TRANSFER_VALIDITY_S = 300;
-
-export interface FriendTransfer extends TransferAuthorization {
-  to: Hex;
-  value: string;
-  nonce: Hex;
-}
-
-/** Signs a payment to a friend, with a random one-time nonce. */
-export async function signTransfer(params: { to: Hex; value: bigint; domain: UsdcDomain }): Promise<FriendTransfer> {
-  const nonce = toHex(crypto.getRandomValues(new Uint8Array(32)));
-  const validBefore = BigInt(Math.floor(Date.now() / 1000) + TRANSFER_VALIDITY_S);
-  const auth = await sign({ to: params.to, value: params.value, validBefore, nonce, domain: params.domain });
-  return { ...auth, to: params.to, value: params.value.toString(), nonce };
 }
 
 async function sign(params: { to: Hex; value: bigint; validBefore: bigint; nonce: Hex; domain: UsdcDomain }): Promise<TransferAuthorization> {

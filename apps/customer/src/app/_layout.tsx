@@ -17,9 +17,6 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ title: 'Kasi Rails' }} />
         <Stack.Screen name="pay" options={{ title: 'Pay' }} />
         <Stack.Screen name="receive" options={{ title: 'Receive money' }} />
-        <Stack.Screen name="friends" options={{ title: 'Friends' }} />
-        <Stack.Screen name="add-friend" options={{ title: 'Add a friend' }} />
-        <Stack.Screen name="amount" options={{ title: '' }} />
       </Stack>
     </>
   );

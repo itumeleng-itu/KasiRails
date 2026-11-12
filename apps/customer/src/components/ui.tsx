@@ -4,7 +4,7 @@ export const colors = {
   bg: '#FFFFFF',
   fg: '#111111',
   muted: '#5C5C5C',
-  primary: '#FFD400',
+  primary: '#FF7A00',
   card: '#F4F4F4',
   success: '#00A651',
   danger: '#C62828',

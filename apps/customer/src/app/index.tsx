@@ -3,15 +3,14 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'rea
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { FriendsSheet } from '@/components/friends-sheet';
-import { ArrowIcon, EyeIcon, PersonIcon } from '@/components/icons';
+import { ArrowIcon, EyeIcon } from '@/components/icons';
 import { BigButton, colors } from '@/components/ui';
 import { usdcToZarCents } from '@kasi-rails/shared';
 
 import { getHistory, type HistoryItem } from '@/lib/api';
 import { readRate, readUsdcBalance } from '@/lib/chain';
 import { formatDollars, formatRand, formatWhen, shortCode } from '@/lib/format';
-import { findFriend, getHideBalance, listFriends, setHideBalance, type Friend } from '@/lib/friends';
+import { getHideBalance, setHideBalance } from '@/lib/prefs';
 import { getAddress } from '@/lib/wallet';
 
 const HIDDEN = 'R ••••••';
@@ -27,12 +26,10 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const [balance, setBalance] = useState<Money | null>(null);
   const [history, setHistory] = useState<HistoryItem[] | null>(null);
-  const [friends, setFriends] = useState<Friend[]>([]);
   const [hidden, setHidden] = useState(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
 
   const load = useCallback(async () => {
     const address = await getAddress().catch(() => null);
@@ -51,7 +48,6 @@ export default function Home() {
       getHistory(address)
         .then((h) => (setHistory(h), setHistoryError(null)))
         .catch((err) => setHistoryError(err instanceof Error ? err.message : 'Could not load your history.')),
-      listFriends().then(setFriends),
     ]);
   }, []);
 
@@ -107,14 +103,6 @@ export default function Home() {
       </View>
 
       <Text style={styles.sectionTitle}>Recent activity</Text>
-      {history && history.length === 0 ? <Text style={styles.empty}>No history</Text> : null}
-      {!history && historyError ? (
-        <>
-          <Text style={styles.empty}>No history to show</Text>
-          <Text style={styles.error}>{historyError}</Text>
-        </>
-      ) : null}
-      {!history && !historyError ? <Text style={styles.empty}>Loading…</Text> : null}
     </View>
   );
 
@@ -124,36 +112,30 @@ export default function Home() {
         data={history ?? []}
         keyExtractor={(item, i) => `${item.txHash}-${i}`}
         ListHeaderComponent={header}
-        renderItem={({ item }) => <HistoryRow item={item} friends={friends} hidden={hidden} />}
+        renderItem={({ item }) => <HistoryRow item={item} hidden={hidden} />}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
-        contentContainerStyle={{ paddingBottom: 110 + insets.bottom }}
+        ListEmptyComponent={
+          <View style={styles.emptyBox}>
+            {history ? <Text style={styles.empty}>No history</Text> : null}
+            {!history && historyError ? (
+              <>
+                <Text style={styles.empty}>No history to show</Text>
+                <Text style={[styles.error, styles.centerText]}>{historyError}</Text>
+              </>
+            ) : null}
+            {!history && !historyError ? <Text style={styles.empty}>Loading…</Text> : null}
+          </View>
+        }
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 + insets.bottom }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      />
-
-      <Pressable
-        onPress={() => setSheetOpen(true)}
-        accessibilityRole="button"
-        accessibilityLabel="Friends"
-        style={({ pressed }) => [styles.fab, { bottom: 24 + insets.bottom }, pressed && styles.fabPressed]}>
-        <PersonIcon size={32} />
-      </Pressable>
-
-      <FriendsSheet
-        visible={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        onChoose={(mode) => {
-          setSheetOpen(false);
-          router.push({ pathname: '/friends', params: { mode } });
-        }}
       />
     </View>
   );
 }
 
-function HistoryRow({ item, friends, hidden }: { item: HistoryItem; friends: Friend[]; hidden: boolean }) {
-  const friend = findFriend(friends, item.counterparty);
-  const name = item.label ?? friend?.name ?? (item.direction === 'in' ? 'Money received' : 'Money sent');
-  const detail = item.label || friend ? formatWhen(item.timestamp) : `${formatWhen(item.timestamp)} · ${shortCode(item.counterparty)}`;
+function HistoryRow({ item, hidden }: { item: HistoryItem; hidden: boolean }) {
+  const name = item.label ?? (item.direction === 'in' ? 'Money received' : 'Money sent');
+  const detail = item.label ? formatWhen(item.timestamp) : `${formatWhen(item.timestamp)} · ${shortCode(item.counterparty)}`;
   const incoming = item.direction === 'in';
   return (
     <View style={styles.row}>
@@ -162,7 +144,7 @@ function HistoryRow({ item, friends, hidden }: { item: HistoryItem; friends: Fri
       </View>
       <View style={styles.rowMain}>
         <Text style={styles.rowName} numberOfLines={1}>
-          {incoming ? name : item.label ? `Paid ${name}` : friend ? `Sent to ${name}` : name}
+          {incoming ? name : item.label ? `Paid ${name}` : name}
         </Text>
         <Text style={styles.rowDetail}>{detail}</Text>
       </View>
@@ -185,8 +167,10 @@ const styles = StyleSheet.create({
   error: { fontSize: 16, color: colors.danger },
   actions: { flexDirection: 'row', gap: 12 },
   action: { flex: 1, minHeight: 64 },
-  sectionTitle: { fontSize: 20, fontWeight: '800', color: colors.fg, marginTop: 8 },
-  empty: { fontSize: 17, color: colors.muted },
+  sectionTitle: { fontSize: 20, fontWeight: '800', color: colors.fg, marginTop: 8, textAlign: 'center' },
+  emptyBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 32 },
+  empty: { fontSize: 18, color: colors.muted, textAlign: 'center' },
+  centerText: { textAlign: 'center' },
   separator: { height: 1, backgroundColor: '#EEEEEE', marginLeft: 76 },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, gap: 12 },
   rowIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
@@ -196,20 +180,4 @@ const styles = StyleSheet.create({
   rowName: { fontSize: 17, fontWeight: '700', color: colors.fg },
   rowDetail: { fontSize: 14, color: colors.muted },
   rowAmount: { fontSize: 17, fontWeight: '800', color: colors.fg, fontVariant: ['tabular-nums'] },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-  },
-  fabPressed: { opacity: 0.8 },
 });

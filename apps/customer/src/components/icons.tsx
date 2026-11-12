@@ -2,15 +2,6 @@ import Svg, { Circle, Path } from 'react-native-svg';
 
 type IconProps = { size?: number; color?: string };
 
-export function PersonIcon({ size = 30, color = '#111111' }: IconProps) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Circle cx={12} cy={8} r={4} fill={color} />
-      <Path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill={color} />
-    </Svg>
-  );
-}
-
 export function EyeIcon({ size = 26, color = '#5C5C5C', crossed = false }: IconProps & { crossed?: boolean }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
