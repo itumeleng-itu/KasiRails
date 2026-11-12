@@ -40,6 +40,16 @@ export function createApp(deps: { config: Config; repo: OrderRepo; payments: Pay
   app.disable('x-powered-by');
   app.use(express.json({ limit: '10kb' }));
 
+  // One line per API request (method, path, status, time, caller IP); vendor page assets are skipped.
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/vendor/') && !req.path.endsWith('.svg')) return next();
+    const start = Date.now();
+    res.on('finish', () => {
+      console.log(`${req.method} ${req.originalUrl.split('?')[0]} ${res.statusCode} ${Date.now() - start}ms from ${req.ip}`);
+    });
+    next();
+  });
+
   const withShop = (order: Order) => ({ ...order, shopName: config.shopName, shopAddress: config.shopAddress });
 
   async function findOrder(req: Request<{ id: string }>) {
