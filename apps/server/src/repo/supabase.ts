@@ -189,6 +189,12 @@ export class SupabaseOrderRepo implements OrderRepo {
     return row ? userFromRow(row) : null;
   }
 
+  async getUsersByAddresses(addresses: string[]) {
+    if (addresses.length === 0) return [];
+    const rows = unwrap(await this.db.from('users').select('*').in('address', addresses).returns<UserRow[]>(), 'get users');
+    return (rows ?? []).map(userFromRow);
+  }
+
   async getUserByAddress(address: string) {
     const row = unwrap(await this.db.from('users').select('*').eq('address', address).maybeSingle<UserRow>(), 'get user');
     return row ? userFromRow(row) : null;

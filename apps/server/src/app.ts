@@ -134,7 +134,12 @@ export function createApp(deps: { config: Config; repo: OrderRepo; payments: Pay
         zarPerUsdc: rate.zarPerUsdc,
         knownShops: { [config.shopAddress]: config.shopName },
       });
-      res.json({ items, zarPerUsdc: rate.zarPerUsdc });
+      // Name people the user paid or got paid by, when they have a username.
+      const others = [...new Set(items.filter((i) => !i.label).map((i) => i.counterparty))];
+      const users = await repo.getUsersByAddresses(others).catch(() => []);
+      const names = new Map(users.map((u) => [u.address, u.username]));
+      const named = items.map((i) => (names.has(i.counterparty) ? { ...i, username: names.get(i.counterparty) } : i));
+      res.json({ items: named, zarPerUsdc: rate.zarPerUsdc });
     } catch (err) {
       console.warn('History lookup failed:', err instanceof Error ? err.message : err);
       throw new HttpError(503, "Couldn't load your history right now. Pull down to try again.", 'HISTORY_UNAVAILABLE');

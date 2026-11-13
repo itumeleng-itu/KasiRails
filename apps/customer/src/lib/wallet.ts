@@ -1,4 +1,4 @@
-import type { Hex } from 'viem';
+import { toHex, type Hex } from 'viem';
 import { CHAIN_ID, USDC_ADDRESS, orderIdToNonce, transferWithAuthorizationTypes } from '@kasi-rails/shared';
 
 import { activeSigner } from './accounts';
@@ -53,4 +53,31 @@ export async function signPayment(params: {
     },
   });
   return { from: account.address, validAfter: '0', validBefore: params.validBefore.toString(), signature };
+}
+
+/** How long a payment to another person stays valid after signing. */
+const TRANSFER_VALIDITY_S = 300;
+
+export interface PersonTransfer extends TransferAuthorization {
+  to: Hex;
+  value: string;
+  nonce: Hex;
+}
+
+/** Signs a payment of `value` USDC units to another wallet, with a random one-time nonce. */
+export async function signTransfer(params: { to: Hex; value: bigint; domain: UsdcDomain }): Promise<PersonTransfer> {
+  const { domain } = params;
+  if (domain.chainId !== CHAIN_ID || domain.verifyingContract.toLowerCase() !== USDC_ADDRESS.toLowerCase()) {
+    throw new Error('Unexpected payment network.');
+  }
+  const account = activeSigner();
+  const nonce = toHex(crypto.getRandomValues(new Uint8Array(32)));
+  const validBefore = BigInt(Math.floor(Date.now() / 1000) + TRANSFER_VALIDITY_S);
+  const signature = await account.signTypedData({
+    domain: { name: domain.name, version: domain.version, chainId: CHAIN_ID, verifyingContract: USDC_ADDRESS },
+    types: transferWithAuthorizationTypes,
+    primaryType: 'TransferWithAuthorization',
+    message: { from: account.address, to: params.to, value: params.value, validAfter: 0n, validBefore, nonce },
+  });
+  return { from: account.address, validAfter: '0', validBefore: validBefore.toString(), signature, to: params.to, value: params.value.toString(), nonce };
 }

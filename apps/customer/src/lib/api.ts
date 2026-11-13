@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import type { Order } from '@kasi-rails/shared';
 import { getAddress, isAddress, type Hex } from 'viem';
-import type { TransferAuthorization, UsdcDomain } from './wallet';
+import type { PersonTransfer, TransferAuthorization, UsdcDomain } from './wallet';
 
 const SERVER_PORT = 3000;
 
@@ -87,6 +87,7 @@ export interface HistoryItem {
   direction: 'in' | 'out';
   counterparty: string;
   label?: string;
+  username?: string;
   usdcAmount: string;
   zarCents: number;
   timestamp: string;
@@ -98,6 +99,28 @@ export async function getHistory(address: string): Promise<HistoryItem[]> {
 
 export async function getRate(api = API_URL): Promise<{ zarPerUsdc: number; source: 'valr' | 'fallback' }> {
   return (await request<{ zarPerUsdc: number; source: 'valr' | 'fallback' }>(api, '/rate')).body;
+}
+
+/** Finds a registered user by username; null if nobody has it. */
+export async function lookupUser(username: string): Promise<{ username: string; address: Hex } | null> {
+  try {
+    return (await request<{ username: string; address: Hex }>(API_URL, `/users/${encodeURIComponent(username)}`)).body;
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 404 || err.status === 400)) return null;
+    throw err;
+  }
+}
+
+/** Sends a signed payment to another person through the relayer. */
+export async function sendTransfer(auth: PersonTransfer): Promise<{ txHash: string; confirmed: boolean }> {
+  return (
+    await request<{ txHash: string; confirmed: boolean }>(
+      API_URL,
+      '/transfers',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(auth) },
+      PAY_TIMEOUT_MS,
+    )
+  ).body;
 }
 
 export type Scan = { kind: 'order'; orderId: string; api: string } | { kind: 'address'; address: Hex };

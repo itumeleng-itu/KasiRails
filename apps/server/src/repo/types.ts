@@ -29,6 +29,7 @@ export interface OrderRepo {
   createUser(user: User): Promise<void>;
   getUserByUsername(username: string): Promise<User | null>;
   getUserByAddress(address: string): Promise<User | null>;
+  getUsersByAddresses(addresses: string[]): Promise<User[]>;
 }
 
 export class UsernameTakenError extends Error {}

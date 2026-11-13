@@ -11,6 +11,8 @@ export interface HistoryItem {
   counterparty: string;
   /** Set when the counterparty is a known shop. */
   label?: string;
+  /** Set when the counterparty is a registered Kasi Rails user. */
+  username?: string;
   usdcAmount: string;
   /** Rand value at today's rate (not the rate at the time). */
   zarCents: number;

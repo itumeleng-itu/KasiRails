@@ -102,6 +102,7 @@ export default function Home() {
 
       <View style={styles.actions}>
         <BigButton label="Pay" onPress={() => router.push('/pay')} style={styles.action} />
+        <BigButton label="Send" onPress={() => router.push('/send')} style={styles.action} />
         <BigButton label="Receive" variant="secondary" onPress={() => router.push('/receive')} style={styles.action} />
       </View>
 
@@ -149,8 +150,10 @@ export default function Home() {
 }
 
 function HistoryRow({ item, hidden }: { item: HistoryItem; hidden: boolean }) {
-  const name = item.label ?? (item.direction === 'in' ? 'Money received' : 'Money sent');
-  const detail = item.label ? formatWhen(item.timestamp) : `${formatWhen(item.timestamp)} · ${shortCode(item.counterparty)}`;
+  const incomingFallback = item.username ? `From @${item.username}` : 'Money received';
+  const outgoingFallback = item.username ? `Sent to @${item.username}` : 'Money sent';
+  const name = item.label ?? (item.direction === 'in' ? incomingFallback : outgoingFallback);
+  const detail = item.label || item.username ? formatWhen(item.timestamp) : `${formatWhen(item.timestamp)} · ${shortCode(item.counterparty)}`;
   const incoming = item.direction === 'in';
   return (
     <View style={styles.row}>

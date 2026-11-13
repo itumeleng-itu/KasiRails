@@ -84,6 +84,11 @@ export class MemoryOrderRepo implements OrderRepo {
     return user ? { ...user } : null;
   }
 
+  async getUsersByAddresses(addresses: string[]) {
+    const wanted = new Set(addresses);
+    return [...this.users.values()].filter((u) => wanted.has(u.address)).map((u) => ({ ...u }));
+  }
+
   async getUserByAddress(address: string) {
     const user = [...this.users.values()].find((u) => u.address === address);
     return user ? { ...user } : null;

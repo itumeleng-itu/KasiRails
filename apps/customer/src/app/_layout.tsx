@@ -18,6 +18,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ title: 'Kasi Rails' }} />
         <Stack.Screen name="pay" options={{ title: 'Pay' }} />
         <Stack.Screen name="receive" options={{ title: 'Receive money' }} />
+        <Stack.Screen name="send" options={{ title: 'Send money' }} />
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
       </Stack>
     </AuthGate>
