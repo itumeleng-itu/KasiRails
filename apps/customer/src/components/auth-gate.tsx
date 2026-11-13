@@ -1,5 +1,6 @@
 import { Fragment, createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { USERNAME_PATTERN, normalizeUsername } from '@kasi-rails/shared';
 
@@ -33,8 +34,32 @@ import {
 } from '@/lib/auth';
 import { shortCode } from '@/lib/format';
 
-/** Lock again if the app was in the background for longer than this. */
-const RELOCK_AFTER_MS = 15_000;
+/** Lock again if the app was in the background for longer than this (e.g. not when copying an address from another app). */
+const RELOCK_AFTER_MS = 2 * 60_000;
+
+// Development only: Expo reloads the app on every code change, which would otherwise always
+// land on the login screen. A short session survives those reloads. Never used in release builds.
+const DEV_SESSION_KEY = 'kasi-rails.dev-session';
+const DEV_SESSION_MS = 10 * 60_000;
+
+async function saveDevSession(id: string) {
+  if (__DEV__) await SecureStore.setItemAsync(DEV_SESSION_KEY, JSON.stringify({ id, until: Date.now() + DEV_SESSION_MS })).catch(() => {});
+}
+
+async function readDevSession(): Promise<string | null> {
+  if (!__DEV__) return null;
+  try {
+    const raw = await SecureStore.getItemAsync(DEV_SESSION_KEY);
+    const session = raw ? (JSON.parse(raw) as { id: string; until: number }) : null;
+    return session && session.until > Date.now() ? session.id : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearDevSession() {
+  if (__DEV__) SecureStore.deleteItemAsync(DEV_SESSION_KEY).catch(() => {});
+}
 const MIN_PIN = 4;
 const MAX_PIN = 6;
 
@@ -80,20 +105,24 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setScreen(accounts.length === 1 ? { kind: 'unlock', account: accounts[0], canSwitch: true } : { kind: 'pick', accounts });
   }, []);
 
+  const enter = useCallback(async (info: AccountInfo) => {
+    await activate(info);
+    setAccount(info);
+    setScreen({ kind: 'ready' });
+    saveDevSession(info.id);
+  }, []);
+
   useEffect(() => {
     (async () => {
       await migrateLegacyWallet().catch(() => {});
       const resumed = await resumeSignup();
       if (resumed) return setScreen({ kind: 'set-pin', account: resumed });
+      const sessionId = await readDevSession();
+      const sessionAccount = sessionId ? (await listAccounts()).find((a) => a.id === sessionId) : undefined;
+      if (sessionAccount) return enter(sessionAccount);
       await showStart();
     })().catch(() => setScreen({ kind: 'signup', canCancel: false }));
-  }, [showStart]);
-
-  const enter = useCallback(async (info: AccountInfo) => {
-    await activate(info);
-    setAccount(info);
-    setScreen({ kind: 'ready' });
-  }, []);
+  }, [showStart, enter]);
 
   // Lock (not log out) when the app comes back after a while in the background.
   useEffect(() => {
@@ -103,13 +132,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
         const away = Date.now() - backgroundedAt.current;
         backgroundedAt.current = null;
         const current = activeAccount();
-        if (away > RELOCK_AFTER_MS && current) setScreen((s) => (s.kind === 'ready' ? { kind: 'unlock', account: current, canSwitch: true } : s));
+        if (away > RELOCK_AFTER_MS && current) {
+          clearDevSession();
+          setScreen((s) => (s.kind === 'ready' ? { kind: 'unlock', account: current, canSwitch: true } : s));
+        }
       }
     });
     return () => sub.remove();
   }, []);
 
   const logout = useCallback(() => {
+    clearDevSession();
     deactivate();
     setAccount(null);
     listAccounts().then((accounts) => setScreen({ kind: 'pick', accounts }));
@@ -118,6 +151,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const removeCurrentAccount = useCallback(async () => {
     const current = activeAccount();
     if (!current) return;
+    clearDevSession();
     await removeAccount(current.id);
     setAccount(null);
     await showStart();
@@ -155,7 +189,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
               <Unlock
                 key={screen.account.id}
                 account={screen.account}
-                onDone={() => (activeAccount()?.id === screen.account.id ? setScreen({ kind: 'ready' }) : enter(screen.account))}
+                onDone={() => {
+                  if (activeAccount()?.id !== screen.account.id) return enter(screen.account);
+                  setScreen({ kind: 'ready' });
+                  saveDevSession(screen.account.id);
+                }}
                 onSwitch={screen.canSwitch ? () => listAccounts().then((accounts) => setScreen({ kind: 'pick', accounts })) : undefined}
               />
             ) : null}
