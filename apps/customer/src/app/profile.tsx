@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/components/auth-gate';
@@ -14,6 +15,7 @@ export default function Profile() {
   const [bio, setBio] = useState<BiometricInfo | null>(null);
   const [bioOn, setBioOn] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!account) return;
@@ -21,7 +23,19 @@ export default function Profile() {
     isBiometricsEnabled(account.id).then(setBioOn);
   }, [account]);
 
+  // Hide the "Copied" note again after a moment.
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(t);
+  }, [copied]);
+
   if (!account) return null;
+
+  const copyAddress = async () => {
+    await Clipboard.setStringAsync(account.address);
+    setCopied(true);
+  };
 
   const toggleBiometrics = async (on: boolean) => {
     if (on && !(await authenticateBiometric(`Turn on ${bio?.label ?? 'fingerprint'}`))) return;
@@ -70,7 +84,10 @@ export default function Profile() {
           <Text style={styles.avatarText}>{account.username.slice(0, 1).toUpperCase()}</Text>
         </View>
         <Text style={styles.name}>@{account.username}</Text>
-        <Text style={styles.code}>{shortCode(account.address)}</Text>
+        <Pressable onPress={copyAddress} hitSlop={12} accessibilityRole="button" accessibilityLabel="Copy your code" style={({ pressed }) => [styles.codeButton, pressed && styles.pressed]}>
+          <Text style={styles.code}>{shortCode(account.address)}</Text>
+          <Text style={[styles.copyHint, copied && { color: colors.success }]}>{copied ? 'Copied ✓' : 'Tap to copy'}</Text>
+        </Pressable>
       </View>
 
       {bio?.available ? (
@@ -98,7 +115,10 @@ const styles = StyleSheet.create({
   avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 36, fontWeight: '900', color: colors.fg },
   name: { fontSize: 26, fontWeight: '900', color: colors.fg },
-  code: { fontSize: 15, color: colors.muted },
+  codeButton: { alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: colors.card },
+  pressed: { opacity: 0.6 },
+  code: { fontSize: 16, fontWeight: '700', color: colors.fg },
+  copyHint: { fontSize: 13, color: colors.muted },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 16, backgroundColor: colors.card },
   rowTitle: { fontSize: 18, fontWeight: '700', color: colors.fg },
   rowBody: { fontSize: 14, color: colors.muted },

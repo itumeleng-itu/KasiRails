@@ -13,6 +13,7 @@
     "@kasi-rails/shared": "*",
     "expo": "~58.0.25",
     "expo-camera": "~58.0.14",
+    "expo-clipboard": "~58.0.4",
     "expo-constants": "~58.0.16",
     "expo-linking": "~58.0.17",
     "expo-local-authentication": "~58.0.3",
