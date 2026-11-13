@@ -62,6 +62,10 @@ export class MemoryOrderRepo implements OrderRepo {
     return [...this.orders.values()].filter((o) => o.status === 'PENDING' && o.txHash).map((o) => ({ ...o }));
   }
 
+  async listRefundsInFlight() {
+    return [...this.orders.values()].filter((o) => o.status === 'PAID' && o.refundTxHash).map((o) => ({ ...o }));
+  }
+
   async createTopUp(topUp: TopUp) {
     this.topUps.push({ ...topUp });
   }

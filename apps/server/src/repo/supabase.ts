@@ -144,6 +144,14 @@ export class SupabaseOrderRepo implements OrderRepo {
     return (rows ?? []).map(fromRow);
   }
 
+  async listRefundsInFlight() {
+    const rows = unwrap(
+      await this.db.from('orders').select('*').eq('status', 'PAID').not('refund_tx_hash', 'is', null).returns<OrderRow[]>(),
+      'list refunds in flight',
+    );
+    return (rows ?? []).map(fromRow);
+  }
+
   async createTopUp(t: TopUp) {
     const row: TopUpRow = {
       id: t.id,

@@ -5,7 +5,7 @@ import { loadConfig } from './config';
 import { createPayments } from './payments';
 import { lanAddresses, publicUrl } from './network';
 import { createOrderRepo } from './repo';
-import { createTopUps } from './topups';
+import { createShopOwner } from './shop';
 
 const SWEEP_INTERVAL_MS = 5_000;
 
@@ -16,7 +16,7 @@ async function main() {
 
   const relayer = createRelayer(config.relayerKey);
   const payments = createPayments({ repo, relayer, shopAddress: config.shopAddress });
-  const topUps = createTopUps({
+  const owner = createShopOwner({
     repo,
     relayer,
     shopKey: config.shopKey,
@@ -24,7 +24,7 @@ async function main() {
     ownerPin: config.ownerPin,
     fallbackZarPerUsdc: config.fallbackZarPerUsdc,
   });
-  const app = createApp({ config, repo, payments, topUps });
+  const app = createApp({ config, repo, payments, owner });
 
   let sweeping = false;
   setInterval(async () => {
@@ -32,6 +32,7 @@ async function main() {
     sweeping = true;
     try {
       await payments.sweep();
+      await owner.reconcileRefunds();
     } catch (err) {
       console.error('Sweep failed:', err instanceof Error ? err.message : err);
     } finally {

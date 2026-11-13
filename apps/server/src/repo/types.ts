@@ -22,6 +22,8 @@ export interface OrderRepo {
   expireDue(now: Date): Promise<Order[]>;
   /** PENDING orders with a submitted tx that hasn't been confirmed yet. */
   listSubmitted(): Promise<Order[]>;
+  /** PAID orders with a refund tx submitted but not yet confirmed. */
+  listRefundsInFlight(): Promise<Order[]>;
   createTopUp(topUp: TopUp): Promise<void>;
   /** Top-ups created at or after `since`, newest first. */
   listTopUpsSince(since: Date): Promise<TopUp[]>;

@@ -12,7 +12,7 @@ import { getRate } from './rate';
 import type { OrderRepo } from './repo';
 import { createRequire } from 'node:module';
 import { publicUrl } from './network';
-import type { TopUps } from './topups';
+import type { ShopOwner } from './shop';
 import { createUsersRouter } from './users';
 import { ROOT_DIR } from './paths';
 
@@ -37,8 +37,8 @@ function parseZarCents(zar: unknown): number {
   return cents;
 }
 
-export function createApp(deps: { config: Config; repo: OrderRepo; payments: Payments; topUps: TopUps }) {
-  const { config, repo, payments, topUps } = deps;
+export function createApp(deps: { config: Config; repo: OrderRepo; payments: Payments; owner: ShopOwner }) {
+  const { config, repo, payments, owner } = deps;
   const app = express();
   app.disable('x-powered-by');
   // Behind one proxy when hosted (e.g. Railway), so req.ip is the caller's address.
@@ -115,6 +115,13 @@ export function createApp(deps: { config: Config; repo: OrderRepo; payments: Pay
     res.json(withShop(await findOrder(req)));
   });
 
+  // Shop owner: refund a PAID order to its payer from the float.
+  app.post('/orders/:id/refund', async (req, res) => {
+    owner.checkPin(req.get('x-owner-pin'));
+    const { order, confirmed } = await owner.refund(req.params.id);
+    res.status(confirmed ? 200 : 202).json({ ...withShop(order), confirmed });
+  });
+
   app.post('/orders/:id/pay', async (req, res) => {
     const { order, confirmed } = await payments.pay(req.params.id, req.body ?? {});
     res.status(confirmed ? 200 : 202).json(withShop(order));
@@ -165,23 +172,23 @@ export function createApp(deps: { config: Config; repo: OrderRepo; payments: Pay
 
   // ---- Shop owner: cash top-ups (PIN in the x-owner-pin header)
   app.post('/owner/check-pin', (req, res) => {
-    topUps.checkPin(req.get('x-owner-pin'));
+    owner.checkPin(req.get('x-owner-pin'));
     res.json({ ok: true });
   });
 
   app.get('/float', async (_req, res) => {
-    res.json({ ...(await topUps.getFloat()), shopName: config.shopName, shopAddress: config.shopAddress });
+    res.json({ ...(await owner.getFloat()), shopName: config.shopName, shopAddress: config.shopAddress });
   });
 
   app.post('/topups', async (req, res) => {
-    topUps.checkPin(req.get('x-owner-pin'));
+    owner.checkPin(req.get('x-owner-pin'));
     const zarCents = parseZarCents(req.body?.zar);
-    const result = await topUps.topUp(zarCents, req.body?.customerAddress);
+    const result = await owner.topUp(zarCents, req.body?.customerAddress);
     res.status(result.confirmed ? 201 : 202).json(result);
   });
 
   app.get('/topups', async (req, res) => {
-    topUps.checkPin(req.get('x-owner-pin'));
+    owner.checkPin(req.get('x-owner-pin'));
     if (req.query.day !== 'today') throw new HttpError(400, 'Use ?day=today.', 'BAD_REQUEST');
     res.json({ topUps: await repo.listTopUpsSince(startOfTodaySast()) });
   });
