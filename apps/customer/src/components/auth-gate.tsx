@@ -1,6 +1,7 @@
 import { Fragment, createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { USERNAME_PATTERN, normalizeUsername } from '@kasi-rails/shared';
 
@@ -55,6 +56,11 @@ async function readDevSession(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/** Back to Home, so the next person to log in doesn't land on the last screen (e.g. Profile). */
+function returnHome() {
+  if (router.canDismiss()) router.dismissAll();
 }
 
 function clearDevSession() {
@@ -143,6 +149,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     clearDevSession();
+    returnHome();
     deactivate();
     setAccount(null);
     listAccounts().then((accounts) => setScreen({ kind: 'pick', accounts }));
@@ -152,6 +159,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     const current = activeAccount();
     if (!current) return;
     clearDevSession();
+    returnHome();
     await removeAccount(current.id);
     setAccount(null);
     await showStart();
@@ -190,7 +198,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
                 key={screen.account.id}
                 account={screen.account}
                 onDone={() => {
-                  if (activeAccount()?.id !== screen.account.id) return enter(screen.account);
+                  if (activeAccount()?.id !== screen.account.id) {
+                    returnHome();
+                    return enter(screen.account);
+                  }
                   setScreen({ kind: 'ready' });
                   saveDevSession(screen.account.id);
                 }}
