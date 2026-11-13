@@ -34,7 +34,7 @@ The server runs on Render: **https://kasi-rails.onrender.com**
 
 The free Render plan sleeps after 15 minutes without traffic. If a page is slow to open, wait about a minute while it wakes up.
 
-**Demo video:** link coming soon.
+**Demo video:** link coming soon. The walkthrough it follows is under [Demo video](#demo-video).
 
 ## Features
 
@@ -202,7 +202,16 @@ The same `Dockerfile` also works on Railway or any Docker host (Railway's `RAILW
 
 ## Demo video
 
-Link coming soon.
+Link coming soon. The video follows this walkthrough, which you can also run yourself against the hosted server (about 3 minutes).
+
+**Setup:** the till open on a laptop or tablet, the Kasi Rails app on a phone in Expo Go, and the Today page open in another tab. Open `/health` first to wake the server.
+
+1. **Pay at the till.** Key in R85 on the till and tap **Charge**. On the phone, tap **Pay**, scan the QR code and confirm "Pay R85.00 to Mama Thoko's Spaza?". The till turns green with **PAID** within seconds. The customer needed no ETH: the relayer paid the gas.
+2. **Buy USDC with cash.** Open **Top up**, enter the owner PIN and scan the customer's **Receive** code. Enter R100 cash received. The page shows "Customer gets R97.50 · fee R2.50", and the phone's balance goes up.
+3. **Cash out.** On the till, switch to **Cash out** and key in R100. The till shows "customer pays R102.50 (fee R2.50)". The phone shows "Cash out R100.00 at Mama Thoko's Spaza?". After paying, the till shows **Hand over R100.00 cash**.
+4. **Send money, free.** In the app, tap **Send** and paste a friend's wallet address (the app shows their @username). Send R20. The full amount arrives, with no fee and no gas for the sender.
+5. **Today.** Open the Today page. It shows the sale, the top-up and the cash-out, the fees earned (R5.00), the float, and the expected cash in the drawer. Each row links to Basescan.
+6. **Refund (optional).** Tap **Refund** on the R85 sale. The USDC goes back to the customer from the float, and the row changes to REFUNDED.
 
 ## Team
 
