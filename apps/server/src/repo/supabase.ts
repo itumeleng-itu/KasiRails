@@ -76,7 +76,7 @@ export class SupabaseOrderRepo implements OrderRepo {
   async check() {
     // Not a HEAD request: those report success even when the table is missing.
     for (const table of ['orders', 'topups', 'users']) {
-      const { error } = await this.db.from(table).select('id').limit(1);
+      const { error } = await this.db.from(table).select('*').limit(1);
       if (error?.code === 'PGRST205') {
         throw new Error(`Supabase table "${table}" is missing. Run apps/server/supabase/schema.sql in the Supabase SQL Editor.`);
       }
