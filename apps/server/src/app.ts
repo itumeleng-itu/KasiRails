@@ -107,6 +107,7 @@ export function createApp(deps: { config: Config; repo: OrderRepo; payments: Pay
   });
 
   app.get('/orders', async (req, res) => {
+    owner.checkPin(req.get('x-owner-pin'));
     if (req.query.day !== 'today') throw new HttpError(400, 'Use ?day=today.', 'BAD_REQUEST');
     res.json({ orders: await repo.listCreatedSince(startOfTodaySast()) });
   });

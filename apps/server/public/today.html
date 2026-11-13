@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#111111">
+  <title>Kasi Rails Today</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <nav class="nav"><a href="till.html">Till</a><a href="topup.html">Top up</a><a href="today.html" class="active">Today</a></nav>
+
+  <!-- Owner PIN -->
+  <main id="screen-pin" class="screen" hidden>
+    <div class="sub">Today · enter PIN</div>
+    <div class="amount pin-dots" id="pin-dots" aria-live="polite">····</div>
+    <div class="keypad" id="pin-keypad" role="group" aria-label="PIN keypad">
+      <button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button>
+      <button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button>
+      <button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button>
+      <button data-key="clear" aria-label="Clear">C</button><button data-key="0">0</button><button data-key="back" aria-label="Delete">&#9003;</button>
+    </div>
+    <p id="pin-error" class="error" role="alert"></p>
+    <button id="pin-ok" class="primary" disabled>Unlock</button>
+  </main>
+
+  <!-- Today's sales, top-ups and float -->
+  <main id="screen-today" class="screen" hidden>
+    <header class="bar">
+      <span class="shop" id="shop-name">Kasi Rails</span>
+      <span class="updated" id="updated"></span>
+    </header>
+    <div class="tiles">
+      <div class="tile"><div class="label">Sales paid</div><div class="value" id="t-sales">R0.00</div><div class="small-value" id="t-count">0 sales</div></div>
+      <div class="tile"><div class="label">Top-ups</div><div class="value" id="t-topups">R0.00</div><div class="small-value" id="t-fees">fees R0.00</div></div>
+      <div class="tile"><div class="label">Float</div><div class="value" id="t-float">…</div><div class="small-value" id="t-refunds">&nbsp;</div></div>
+      <div class="tile"><div class="label">Expected cash</div><div class="value" id="t-cash">R0.00</div><div class="small-value">from top-ups</div></div>
+    </div>
+    <p id="today-error" class="error" role="alert"></p>
+    <div class="list" id="list"></div>
+  </main>
+
+  <script src="today.js"></script>
+</body>
+</html>

@@ -8,11 +8,12 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <nav class="nav"><a href="till.html">Till</a><a href="topup.html" class="active">Top up</a><a href="today.html">Today</a></nav>
+
   <!-- Owner PIN -->
   <main id="screen-pin" class="screen" hidden>
     <header class="bar">
       <span class="shop shop-name">Kasi Rails</span>
-      <a class="navlink" href="till.html">Till</a>
     </header>
     <div class="sub">Top-up · enter PIN</div>
     <div class="amount pin-dots" id="pin-dots" aria-live="polite">····</div>
@@ -30,7 +31,6 @@
   <main id="screen-scan" class="screen" hidden>
     <header class="bar">
       <span class="shop shop-name">Kasi Rails</span>
-      <a class="navlink" href="till.html">Till</a>
     </header>
     <div class="float muted" id="float">Float: …</div>
     <div class="sub">Scan the customer's Receive code</div>
