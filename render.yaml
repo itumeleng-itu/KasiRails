@@ -29,4 +29,8 @@ services:
       - key: FALLBACK_ZAR_PER_USDC
         value: "18.50"
       - key: TOPUP_FEE_BPS
-        value: "200"
+        value: "250"
+      - key: CASHOUT_FEE_BPS
+        value: "250"
+      - key: MIN_FEE_ZAR_CENTS
+        value: "100"

@@ -178,3 +178,9 @@ button.refund { min-height: 40px; padding: 0 14px; font-size: 16px; font-weight:
 button.refund:disabled { opacity: 0.5; }
 .empty { color: var(--muted); font-size: 18px; text-align: center; padding: 24px 0; }
 .updated { color: var(--muted); font-size: 13px; }
+
+/* ---- Till: sale / cash-out switch */
+.mode { display: flex; gap: 6px; width: 100%; background: var(--key); border-radius: 12px; padding: 4px; }
+.mode button { flex: 1; min-height: 44px; font-size: 18px; font-weight: 700; border: 0; border-radius: 9px; background: transparent; color: var(--fg); }
+.mode button.active { background: var(--primary); color: var(--primary-fg); }
+.chip.CASHOUT { background: #f59e0b; }

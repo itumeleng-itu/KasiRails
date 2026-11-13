@@ -13,7 +13,7 @@
   var pin = '';
   var entry = '';
   var customer = null;
-  var float = null; // { zarCents, zarPerUsdc, feeBps }
+  var float = null; // { zarCents, zarPerUsdc, feeBps, minFeeZarCents }
   var scanner = null;
 
   function show(name) {
@@ -93,7 +93,7 @@
   function loadFloat() {
     return api('/float').then(function (f) {
       float = f;
-      $('float').textContent = 'Float: ' + formatRand(f.zarCents) + ' · fee ' + (f.feeBps / 100) + '%';
+      $('float').textContent = 'Float: ' + formatRand(f.zarCents) + ' · fee ' + (f.feeBps / 100) + '% (min ' + formatRand(f.minFeeZarCents || 0) + ')';
       Array.prototype.forEach.call(document.querySelectorAll('.shop-name'), function (el) { el.textContent = f.shopName; });
       renderAmount();
     }).catch(function () { $('float').textContent = 'Float: unavailable'; });
@@ -150,10 +150,11 @@
     var error = '';
     if (cents > MAX_CENTS) error = 'Maximum is ' + formatRand(MAX_CENTS);
     if (float && cents > 0) {
-      var fee = Math.floor(cents * float.feeBps / 10000);
+      var fee = Math.max(float.minFeeZarCents || 0, Math.floor(cents * float.feeBps / 10000));
       var net = cents - fee;
-      $('breakdown').textContent = 'Customer gets ' + formatRand(net) + ' · fee ' + formatRand(fee);
-      if (net > float.zarCents) error = 'Not enough float (' + formatRand(float.zarCents) + ')';
+      $('breakdown').textContent = 'Customer gets ' + formatRand(Math.max(0, net)) + ' · fee ' + formatRand(fee);
+      if (net <= 0) error = 'Amount must be more than the ' + formatRand(fee) + ' fee';
+      else if (net > float.zarCents) error = 'Not enough float (' + formatRand(float.zarCents) + ')';
     } else {
       $('breakdown').innerHTML = '&nbsp;';
     }

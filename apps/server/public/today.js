@@ -94,20 +94,27 @@
   }
 
   function render(orders, topUps, float) {
-    var sales = orders.filter(function (o) { return o.status === 'PAID'; });
+    var sum = function (list, f) { return list.reduce(function (s, x) { return s + f(x); }, 0); };
+    var sales = orders.filter(function (o) { return o.status === 'PAID' && o.type !== 'cashout'; });
+    var cashouts = orders.filter(function (o) { return o.status === 'PAID' && o.type === 'cashout'; });
     var refunded = orders.filter(function (o) { return o.status === 'REFUNDED'; });
-    var salesCents = sales.reduce(function (s, o) { return s + o.zarCents; }, 0);
-    var topupCents = topUps.reduce(function (s, t) { return s + t.zarCents; }, 0);
-    var feeCents = topUps.reduce(function (s, t) { return s + t.feeZarCents; }, 0);
+    var salesCents = sum(sales, function (o) { return o.zarCents; });
+    var topupCents = sum(topUps, function (t) { return t.zarCents; });
+    var topupFees = sum(topUps, function (t) { return t.feeZarCents; });
+    var cashoutFees = sum(cashouts, function (o) { return o.feeZarCents || 0; });
+    var cashHandedOut = sum(cashouts, function (o) { return o.zarCents - (o.feeZarCents || 0); });
 
     $('shop-name').textContent = float.shopName || 'Kasi Rails';
     $('t-sales').textContent = formatRand(salesCents);
     $('t-count').textContent = sales.length + (sales.length === 1 ? ' sale' : ' sales');
     $('t-topups').textContent = formatRand(topupCents);
-    $('t-fees').textContent = 'fees ' + formatRand(feeCents);
+    $('t-fees').textContent = formatRand(topupFees + cashoutFees);
+    $('t-topup-fees').textContent = 'fees ' + formatRand(topupFees);
+    $('t-cashouts').textContent = formatRand(cashHandedOut);
+    $('t-cashout-fees').textContent = 'fees ' + formatRand(cashoutFees);
     $('t-float').textContent = formatRand(float.zarCents);
     $('t-refunds').textContent = refunded.length ? refunded.length + ' refunded' : ' ';
-    $('t-cash').textContent = formatRand(topupCents);
+    $('t-cash').textContent = (topupCents < cashHandedOut ? '-' : '') + formatRand(Math.abs(topupCents - cashHandedOut));
 
     var rows = orders.map(function (o) { return { kind: 'sale', at: o.createdAt, item: o }; })
       .concat(topUps.map(function (t) { return { kind: 'topup', at: t.createdAt, item: t }; }))
@@ -141,11 +148,14 @@
   }
 
   function saleRow(o) {
+    var cashout = o.type === 'cashout';
+    var fee = o.feeZarCents || 0;
     var row = el('div', 'row');
-    row.appendChild(el('div', 'main', 'Sale · ' + formatRand(o.zarCents)));
+    row.appendChild(el('div', 'main', cashout ? 'Cash-out · ' + formatRand(o.zarCents - fee) : 'Sale · ' + formatRand(o.zarCents)));
     var side = el('div', 'side');
     side.appendChild(el('span', 'chip ' + o.status, o.status));
-    if (o.status === 'PAID' && !o.refundTxHash) {
+    // Cash-outs aren't refundable: the customer already has the cash.
+    if (o.status === 'PAID' && !o.refundTxHash && !cashout) {
       var btn = el('button', 'refund', refunding[o.id] ? 'Refunding…' : 'Refund');
       btn.disabled = !!refunding[o.id];
       btn.addEventListener('click', function () { refund(o, btn); });
@@ -156,7 +166,8 @@
     row.appendChild(side);
 
     var meta = el('div', 'meta');
-    meta.appendChild(document.createTextNode(time(o.createdAt) + (o.payer ? ' · from ' + shortCode(o.payer) + ' · ' : '')));
+    meta.appendChild(document.createTextNode(time(o.createdAt) + (o.payer ? ' · from ' + shortCode(o.payer) : '') +
+      (cashout ? ' · paid ' + formatRand(o.zarCents) + ' · fee ' + formatRand(fee) : '') + (o.txHash ? ' · ' : '')));
     if (o.txHash) meta.appendChild(txLink('payment', o.txHash));
     if (o.refundTxHash) { meta.appendChild(document.createTextNode(' · ')); meta.appendChild(txLink('refund', o.refundTxHash)); }
     row.appendChild(meta);

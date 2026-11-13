@@ -12,6 +12,9 @@
   var entry = ''; // what's been typed, e.g. "85.5"
   var current = null; // { order, deadline, pollTimer, tickTimer, ttlMs }
   var lastZarCents = 0;
+  var mode = 'sale'; // 'sale' or 'cashout'
+  var lastMode = 'sale';
+  var fees = null; // { cashoutFeeBps, minFeeZarCents } from /health
   // Where phones reach the server. The browser's own origin may be localhost, which a phone can't use.
   var apiUrl = window.location.origin;
   var audioCtx = null;
@@ -82,12 +85,39 @@
   }
 
   // ---- Keypad
+  function cashoutFee(cents) {
+    return Math.max(fees.minFeeZarCents, Math.floor(cents * fees.cashoutFeeBps / 10000));
+  }
+
   function renderEntry() {
     var cents = entryToCents(entry);
     $('amount').textContent = entry ? entry : '0';
     $('charge').disabled = cents <= 0 || cents > MAX_CENTS;
+    $('charge').textContent = mode === 'cashout' ? 'Cash out' : 'Charge';
     $('keypad-error').textContent = cents > MAX_CENTS ? 'Maximum is ' + formatRand(MAX_CENTS) : '';
+    var note = ' ';
+    if (mode === 'cashout') {
+      note = 'Cash to hand over';
+      if (fees && cents > 0) {
+        var fee = cashoutFee(cents);
+        note += ' · customer pays ' + formatRand(cents + fee) + ' (fee ' + formatRand(fee) + ')';
+      }
+    }
+    $('keypad-note').textContent = note;
   }
+
+  function setMode(next) {
+    mode = next;
+    ['sale', 'cashout'].forEach(function (m) {
+      var b = $('mode-' + m);
+      b.classList.toggle('active', m === mode);
+      b.setAttribute('aria-pressed', String(m === mode));
+    });
+    renderEntry();
+  }
+
+  $('mode-sale').addEventListener('click', function () { setMode('sale'); });
+  $('mode-cashout').addEventListener('click', function () { setMode('cashout'); });
 
   function press(key) {
     if (key === 'back') {
@@ -113,19 +143,20 @@
     if ($('screen-keypad').hidden) return;
     if (/^[0-9.]$/.test(e.key)) press(e.key);
     else if (e.key === 'Backspace') press('back');
-    else if (e.key === 'Enter' && !$('charge').disabled) charge(entryToCents(entry));
+    else if (e.key === 'Enter' && !$('charge').disabled) charge(entryToCents(entry), mode);
   });
 
   // ---- Charging
-  function charge(zarCents) {
+  function charge(zarCents, type) {
     unlockAudio();
     lastZarCents = zarCents;
+    lastMode = type;
     $('charge').disabled = true;
     $('keypad-error').textContent = '';
     api('/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ zar: zarCents / 100 }),
+      body: JSON.stringify({ zar: zarCents / 100, type: type }),
     }).then(startOrder).catch(function (err) {
       show('keypad');
       $('keypad-error').textContent = err.message;
@@ -143,6 +174,9 @@
     $('qr').src = 'qr.svg?data=' + encodeURIComponent(payload);
     $('qr-zar').textContent = formatRand(order.zarCents);
     $('qr-usdc').textContent = '≈ ' + formatUsdc(order.usdcAmount);
+    var fee = order.feeZarCents || 0;
+    $('qr-note').hidden = order.type !== 'cashout';
+    $('qr-note').textContent = 'Cash out ' + formatRand(order.zarCents - fee) + ' · fee ' + formatRand(fee);
     $('qr-status').textContent = 'Scan to pay';
     show('qr');
 
@@ -185,6 +219,8 @@
   function onPaid(order) {
     stopOrder();
     $('paid-zar').textContent = formatRand(order.zarCents);
+    $('paid-note').hidden = order.type !== 'cashout';
+    $('paid-note').textContent = 'Hand over ' + formatRand(order.zarCents - (order.feeZarCents || 0)) + ' cash';
     var link = $('paid-tx');
     if (order.txHash) { link.href = EXPLORER + order.txHash; link.hidden = false; } else { link.hidden = true; }
     show('paid');
@@ -200,13 +236,13 @@
   function newSale() {
     stopOrder();
     entry = '';
-    renderEntry();
+    setMode('sale');
     show('keypad');
   }
 
-  $('charge').addEventListener('click', function () { charge(entryToCents(entry)); });
+  $('charge').addEventListener('click', function () { charge(entryToCents(entry), mode); });
   $('cancel').addEventListener('click', newSale);
-  $('charge-again').addEventListener('click', function () { charge(lastZarCents); });
+  $('charge-again').addEventListener('click', function () { charge(lastZarCents, lastMode); });
   Array.prototype.forEach.call(document.querySelectorAll('.new-sale'), function (b) {
     b.addEventListener('click', newSale);
   });
@@ -218,6 +254,7 @@
   api('/health').then(function (h) {
     if (h.shopName) { $('shop-name').textContent = h.shopName; document.title = h.shopName + ' · Till'; }
     if (h.apiUrl) apiUrl = h.apiUrl;
+    if (h.fees) { fees = h.fees; renderEntry(); }
   }).catch(function () {
     $('keypad-error').textContent = 'Cannot reach the server.';
   });

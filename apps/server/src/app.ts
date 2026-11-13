@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import express, { type ErrorRequestHandler, type Request } from 'express';
 import QRCode from 'qrcode';
 import { formatUnits, getAddress, isAddress } from 'viem';
-import { USDC_DECIMALS, usdcToZarCents, zarCentsToUsdc, type Order, type OrderType } from '@kasi-rails/shared';
+import { USDC_DECIMALS, feeZarCents, usdcToZarCents, zarCentsToUsdc, type Order, type OrderType } from '@kasi-rails/shared';
 import { getUsdcDomain, usdcBalance } from './chain';
 import type { Config } from './config';
 import { HttpError, type Payments } from './payments';
@@ -69,6 +69,7 @@ export function createApp(deps: { config: Config; repo: OrderRepo; payments: Pay
       shopName: config.shopName,
       apiUrl: publicUrl(config.port, config.publicUrlOverride),
       store: repo.kind,
+      fees: config.fees,
       // Set by Render (or RAILWAY_GIT_COMMIT_SHA on Railway); shows which commit is deployed.
       commit: (process.env.RENDER_GIT_COMMIT ?? process.env.RAILWAY_GIT_COMMIT_SHA)?.slice(0, 7),
       time: new Date().toISOString(),
@@ -84,9 +85,12 @@ export function createApp(deps: { config: Config; repo: OrderRepo; payments: Pay
   });
 
   app.post('/orders', async (req, res) => {
-    const zarCents = parseZarCents(req.body?.zar);
     const type: OrderType = req.body?.type ?? 'sale';
     if (type !== 'sale' && type !== 'cashout') throw new HttpError(400, "type must be 'sale' or 'cashout'.", 'BAD_REQUEST');
+    // For a cash-out, `zar` is the cash the shop hands over; the customer pays that plus the fee.
+    const amountCents = parseZarCents(req.body?.zar);
+    const fee = type === 'cashout' ? feeZarCents(amountCents, config.fees.cashoutFeeBps, config.fees.minFeeZarCents) : 0;
+    const zarCents = amountCents + fee;
 
     const { zarPerUsdc } = await getRate(config.fallbackZarPerUsdc);
     const usdcAmount = zarCentsToUsdc(zarCents, zarPerUsdc);
@@ -98,6 +102,7 @@ export function createApp(deps: { config: Config; repo: OrderRepo; payments: Pay
       type,
       zarCents,
       usdcAmount: usdcAmount.toString(),
+      feeZarCents: fee,
       status: 'PENDING',
       createdAt: new Date(now).toISOString(),
       expiresAt: new Date(now + config.orderTtlSeconds * 1000).toISOString(),

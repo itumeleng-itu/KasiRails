@@ -20,6 +20,7 @@ The shop is both the till and the ramp.
 
 - **Pay at the till.** The shop shows a QR code, the customer pays in USDC from the Kasi Rails app, and the shop sees **PAID** within seconds.
 - **Buy USDC with cash.** The shop sells USDC from its float to cash customers, for a small fee.
+- **Cash out.** Customers turn USDC back into cash at the counter.
 - **Till income becomes float.** USDC taken at the till is the float for the next cash customer. A bank is only needed to rebalance.
 
 ## Try it
@@ -41,10 +42,22 @@ The free Render plan sleeps after 15 minutes without traffic. If a page is slow 
 - **Automatic matching.** Each payment's EIP-3009 nonce is `keccak256(orderId)`, so a payment can only ever settle the order it was signed for.
 - **Late payments and expiry.** Unpaid orders expire after `ORDER_TTL_SECONDS`. A payment that confirms after its order expired is still recorded as PAID, and a background sweep finishes payments whose confirmation was slow.
 - **Cash top-up.** A customer with only cash pays the shop; the shop sends USDC from its float to the customer's app, minus a small fee (`TOPUP_FEE_BPS`).
+- **Cash-out.** On the till, switch to **Cash out** and key in the cash to hand over. The customer scans and pays that plus the fee (`CASHOUT_FEE_BPS`), and the till shows **Hand over R… cash**. Cash-outs can't be refunded, since the customer already has the cash.
 - **Refunds.** The shop owner can refund a paid sale in full from the float. Refunds are PIN-protected and can't be sent twice.
 - **Merchant view (`today.html`).** Today's sales, top-ups, fees, float and expected cash, with every order's status (PAID, PENDING, EXPIRED, REFUNDED), payer, Basescan links and a Refund button. Refreshes every 5 seconds.
 - **Customer accounts.** Each account has its own wallet on the phone and a unique @username, proven by a wallet signature. The app unlocks with a PIN or Face ID / fingerprint, and several people can have accounts on one phone.
 - **Send money** to any wallet address, and see all activity, named by shop or @username, on the home screen.
+
+## Pricing
+
+| | Fee | Who keeps it |
+|---|---|---|
+| Cash top-up (deposit) | 2.5%, at least R1 | The shop |
+| Cash-out (withdrawal) | 2.5%, at least R1 | The shop |
+| Send money to a person | Free | – |
+| Pay at the till | Free for the customer | – |
+
+Set with `TOPUP_FEE_BPS`, `CASHOUT_FEE_BPS` (basis points: 250 = 2.5%) and `MIN_FEE_ZAR_CENTS` (100 = R1). The relayer pays gas on every payment.
 
 ## How it works
 
@@ -130,7 +143,7 @@ Fund the wallets on Base Sepolia:
 
 ### Run
 
-- Cash top-up (shop sells USDC for cash): open `/vendor/topup.html` (or **Top up** on the till), enter the `OWNER_PIN`, scan the customer's **Receive** code (camera needs https, so use the hosted server, or type the code), and enter the cash received. The customer gets USDC from the shop's float, minus `TOPUP_FEE_BPS` (2% by default); the shop signs and the relayer pays gas. Top-ups are saved in the `topups` table.
+- Cash top-up (shop sells USDC for cash): open `/vendor/topup.html` (or **Top up** on the till), enter the `OWNER_PIN`, scan the customer's **Receive** code (camera needs https, so use the hosted server, or type the code), and enter the cash received. The customer gets USDC from the shop's float, minus `TOPUP_FEE_BPS` (2.5% by default, at least R1); the shop signs and the relayer pays gas. Top-ups are saved in the `topups` table.
 - Gasless payment spike: `npm run spike` sends 0.10 USDC from the customer to the shop. The customer signs, the relayer pays the gas, and the script prints the Basescan link and balances. Each order id can be paid once, so use `npm run spike -- --order spike-2` (and so on) to run it again.
 - Server and till page:
   1. Optional: to use Supabase, set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (the project's secret key) in `.env`, and run `apps/server/supabase/schema.sql` once in the Supabase SQL Editor. Leave `SUPABASE_URL` empty to use the in-memory store.

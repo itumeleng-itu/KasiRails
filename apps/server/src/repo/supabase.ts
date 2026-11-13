@@ -7,6 +7,7 @@ interface OrderRow {
   type: OrderType;
   zar_cents: number;
   usdc_amount: number | string;
+  fee_zar_cents: number;
   status: OrderStatus;
   payer: string | null;
   tx_hash: string | null;
@@ -41,6 +42,7 @@ function fromRow(row: OrderRow): Order {
     type: row.type,
     zarCents: row.zar_cents,
     usdcAmount: String(row.usdc_amount),
+    feeZarCents: row.fee_zar_cents ?? 0,
     status: row.status,
     createdAt: toIso(row.created_at),
     expiresAt: toIso(row.expires_at),
@@ -82,6 +84,9 @@ export class SupabaseOrderRepo implements OrderRepo {
       }
       if (error) throw new Error(`Supabase check failed: ${error.message}`);
     }
+    // Columns added after the first release: tables created by an older schema.sql lack them.
+    const { error } = await this.db.from('orders').select('fee_zar_cents').limit(1);
+    if (error) throw new Error(`Supabase table "orders" is out of date (${error.message}). Run apps/server/supabase/schema.sql again in the Supabase SQL Editor.`);
   }
 
   async create(order: Order) {
@@ -90,6 +95,7 @@ export class SupabaseOrderRepo implements OrderRepo {
       type: order.type,
       zar_cents: order.zarCents,
       usdc_amount: order.usdcAmount,
+      fee_zar_cents: order.feeZarCents,
       status: order.status,
       payer: order.payer ?? null,
       tx_hash: order.txHash ?? null,

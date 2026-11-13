@@ -7,6 +7,11 @@ export interface Order {
   type: OrderType;
   zarCents: number;
   usdcAmount: string;
+  /**
+   * Fee included in zarCents (0 for sales). For a cash-out, zarCents is what the customer pays
+   * and zarCents - feeZarCents is the cash the shop hands over.
+   */
+  feeZarCents: number;
   status: OrderStatus;
   payer?: string;
   txHash?: string;

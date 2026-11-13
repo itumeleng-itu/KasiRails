@@ -10,6 +10,8 @@ create table if not exists public.orders (
   zar_cents       integer not null check (zar_cents > 0),
   -- USDC base units (6 decimals)
   usdc_amount     bigint not null check (usdc_amount > 0),
+  -- Fee included in zar_cents (cash-outs only; 0 for sales)
+  fee_zar_cents   integer not null default 0 check (fee_zar_cents >= 0),
   status          text not null default 'PENDING' check (status in ('PENDING', 'PAID', 'EXPIRED', 'REFUNDED')),
   payer           text,
   tx_hash         text unique,
@@ -17,6 +19,9 @@ create table if not exists public.orders (
   created_at      timestamptz not null default now(),
   expires_at      timestamptz not null
 );
+
+-- Tables created before fees were added to orders.
+alter table public.orders add column if not exists fee_zar_cents integer not null default 0 check (fee_zar_cents >= 0);
 
 create index if not exists orders_created_at_idx on public.orders (created_at desc);
 create index if not exists orders_pending_expires_idx on public.orders (expires_at) where status = 'PENDING';

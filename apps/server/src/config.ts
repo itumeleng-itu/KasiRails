@@ -1,4 +1,5 @@
 import type { Address, Hex } from 'viem';
+import type { Fees } from '@kasi-rails/shared';
 import { privateKeyToAccount } from 'viem/accounts';
 import { loadEnv, requirePrivateKey } from './env';
 
@@ -10,7 +11,7 @@ export interface Config {
   relayerKey: Hex;
   orderTtlSeconds: number;
   fallbackZarPerUsdc: number;
-  topupFeeBps: number;
+  fees: Fees;
   ownerPin: string;
   /** PUBLIC_URL if set; otherwise the LAN address is worked out on each request (see network.ts). */
   publicUrlOverride?: string;
@@ -51,7 +52,11 @@ export function loadConfig(): Config {
     relayerKey: requirePrivateKey('RELAYER_PRIVATE_KEY'),
     orderTtlSeconds: num('ORDER_TTL_SECONDS', 60, (n) => Number.isInteger(n) && n >= 10),
     fallbackZarPerUsdc: num('FALLBACK_ZAR_PER_USDC', 18.5, (n) => Number.isFinite(n) && n > 0),
-    topupFeeBps: num('TOPUP_FEE_BPS', 200, (n) => Number.isInteger(n) && n >= 0 && n < 10_000),
+    fees: {
+      topupFeeBps: num('TOPUP_FEE_BPS', 250, (n) => Number.isInteger(n) && n >= 0 && n < 10_000),
+      cashoutFeeBps: num('CASHOUT_FEE_BPS', 250, (n) => Number.isInteger(n) && n >= 0 && n < 10_000),
+      minFeeZarCents: num('MIN_FEE_ZAR_CENTS', 100, (n) => Number.isInteger(n) && n >= 0),
+    },
     ownerPin: process.env.OWNER_PIN?.trim() || '1234',
     publicUrlOverride: configuredUrl || undefined,
     supabase: supabaseUrl && supabaseKey ? { url: supabaseUrl, key: supabaseKey } : undefined,

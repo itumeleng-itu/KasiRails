@@ -96,11 +96,21 @@ export default function Pay() {
         domain,
       });
       const result = await payOrder(api, o.id, auth);
-      setStep({
-        kind: 'done',
-        zarCents: result.order.zarCents,
-        message: result.confirmed ? `Paid to ${result.order.shopName}` : `Sent to ${result.order.shopName}. The shop will see it in a moment.`,
-      });
+      const r = result.order;
+      if (r.type === 'cashout') {
+        const cash = r.zarCents - (r.feeZarCents ?? 0);
+        setStep({
+          kind: 'done',
+          zarCents: cash,
+          message: result.confirmed ? `Collect ${formatRand(cash)} cash from ${r.shopName}` : `Sent to ${r.shopName}. Collect your cash once the shop sees it.`,
+        });
+      } else {
+        setStep({
+          kind: 'done',
+          zarCents: r.zarCents,
+          message: result.confirmed ? `Paid to ${r.shopName}` : `Sent to ${r.shopName}. The shop will see it in a moment.`,
+        });
+      }
     } catch (err) {
       setStep({ kind: 'error', ...errorFor(err) });
     }
@@ -139,11 +149,14 @@ export default function Pay() {
     const o = step.order;
     const paying = step.kind === 'paying';
     const late = secondsLeft <= 0;
+    const cashout = o.type === 'cashout';
+    const fee = o.feeZarCents ?? 0;
     return (
       <Centered>
-        <Text style={styles.question}>Pay</Text>
-        <Text style={styles.amount} adjustsFontSizeToFit numberOfLines={1}>{formatRand(o.zarCents)}</Text>
-        <Text style={styles.question}>to {o.shopName}?</Text>
+        <Text style={styles.question}>{cashout ? 'Cash out' : 'Pay'}</Text>
+        <Text style={styles.amount} adjustsFontSizeToFit numberOfLines={1}>{formatRand(cashout ? o.zarCents - fee : o.zarCents)}</Text>
+        <Text style={styles.question}>{cashout ? `at ${o.shopName}?` : `to ${o.shopName}?`}</Text>
+        {cashout ? <Text style={styles.muted}>You pay {formatRand(o.zarCents)}, including a {formatRand(fee)} fee.</Text> : null}
         <Text style={[styles.muted, late && { color: colors.danger }]}>
           {late ? 'Time is up. Ask the shop to charge again.' : `${secondsLeft} seconds left`}
         </Text>
@@ -153,7 +166,7 @@ export default function Pay() {
           </Text>
         ) : null}
         <View style={styles.buttons}>
-          <BigButton label={paying ? 'Paying…' : 'Pay'} onPress={onPay} busy={paying} disabled={late || (step.kind === 'confirm' && !step.enough)} />
+          <BigButton label={paying ? 'Paying…' : cashout ? `Pay ${formatRand(o.zarCents)}` : 'Pay'} onPress={onPay} busy={paying} disabled={late || (step.kind === 'confirm' && !step.enough)} />
           {!paying ? <BigButton label="Cancel" variant="secondary" onPress={() => router.back()} /> : null}
         </View>
       </Centered>

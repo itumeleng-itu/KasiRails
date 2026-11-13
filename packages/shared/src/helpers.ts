@@ -45,3 +45,16 @@ export function normalizeUsername(input: string): string {
 export function registrationMessage(username: string, address: string, issuedAt: string): string {
   return `Kasi Rails registration\nUsername: @${username}\nAddress: ${address}\nIssued at: ${issuedAt}`;
 }
+
+/** Fee settings for cash top-ups (deposits) and cash-outs (withdrawals). Person-to-person sends are free. */
+export interface Fees {
+  topupFeeBps: number;
+  cashoutFeeBps: number;
+  /** Smallest fee charged on a top-up or cash-out, in rand cents. */
+  minFeeZarCents: number;
+}
+
+/** Fee in rand cents: `bps` of the amount, rounded down, but at least `minZarCents`. */
+export function feeZarCents(zarCents: number, bps: number, minZarCents: number): number {
+  return Math.max(minZarCents, Math.floor((zarCents * bps) / 10_000));
+}

@@ -16,7 +16,12 @@
       <span id="shop-name" class="shop">Kasi Rails</span>
       <span id="rate" class="muted"></span>
     </header>
+    <div class="mode" role="group" aria-label="Sale or cash-out">
+      <button id="mode-sale" class="active" aria-pressed="true">Sale</button>
+      <button id="mode-cashout" aria-pressed="false">Cash out</button>
+    </div>
     <div class="amount" aria-live="polite"><span class="currency">R</span><span id="amount">0</span></div>
+    <div id="keypad-note" class="breakdown muted">&nbsp;</div>
     <div class="keypad" role="group" aria-label="Amount keypad">
       <button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button>
       <button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button>
@@ -31,6 +36,7 @@
   <main id="screen-qr" class="screen" hidden>
     <div class="amount small"><span id="qr-zar"></span></div>
     <div id="qr-usdc" class="muted"></div>
+    <div id="qr-note" class="breakdown muted" hidden></div>
     <img id="qr" class="qr" alt="Payment QR code">
     <div class="countdown"><div id="countdown-bar"></div></div>
     <div id="qr-status" class="status">Scan to pay</div>
@@ -41,6 +47,7 @@
   <main id="screen-paid" class="screen result paid" hidden>
     <div class="big">PAID</div>
     <div id="paid-zar" class="amount"></div>
+    <div id="paid-note" class="sub" hidden></div>
     <a id="paid-tx" class="txlink" target="_blank" rel="noopener">View payment</a>
     <button class="new-sale secondary">New sale</button>
   </main>

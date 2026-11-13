@@ -20,7 +20,7 @@ async function main() {
     repo,
     relayer,
     shopKey: config.shopKey,
-    feeBps: config.topupFeeBps,
+    fees: config.fees,
     ownerPin: config.ownerPin,
     fallbackZarPerUsdc: config.fallbackZarPerUsdc,
   });

@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { TransactionReceiptNotFoundError, getAddress, isAddress, toHex, type Address, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { CHAIN_ID, USDC_ADDRESS, transferWithAuthorizationTypes, usdcToZarCents, zarCentsToUsdc, type Order, type TopUp } from '@kasi-rails/shared';
+import { CHAIN_ID, USDC_ADDRESS, feeZarCents as feeFor, transferWithAuthorizationTypes, usdcToZarCents, zarCentsToUsdc, type Fees, type Order, type TopUp } from '@kasi-rails/shared';
 import { getUsdcDomain, publicClient, usdcBalance, type Relayer } from './chain';
 import { HttpError, verifyAndSubmit } from './payments';
 import { getRate } from './rate';
@@ -19,14 +19,15 @@ export interface Float {
   zarCents: number;
   zarPerUsdc: number;
   feeBps: number;
+  minFeeZarCents: number;
 }
 
 /**
  * Shop-owner actions that spend the shop's USDC float: cash top-ups and refunds.
  * The shop signs EIP-3009 transfers; the relayer submits them and pays gas.
  */
-export function createShopOwner(deps: { repo: OrderRepo; relayer: Relayer; shopKey: Hex; feeBps: number; ownerPin: string; fallbackZarPerUsdc: number }) {
-  const { repo, relayer, feeBps, ownerPin, fallbackZarPerUsdc } = deps;
+export function createShopOwner(deps: { repo: OrderRepo; relayer: Relayer; shopKey: Hex; fees: Fees; ownerPin: string; fallbackZarPerUsdc: number }) {
+  const { repo, relayer, fees, ownerPin, fallbackZarPerUsdc } = deps;
   const shop = privateKeyToAccount(deps.shopKey);
   /** One float spend at a time, so two sends can't both pass the float check. */
   let busy = false;
@@ -53,7 +54,7 @@ export function createShopOwner(deps: { repo: OrderRepo; relayer: Relayer; shopK
 
   async function getFloat(): Promise<Float> {
     const [units, rate] = await Promise.all([usdcBalance(shop.address), getRate(fallbackZarPerUsdc)]);
-    return { usdcAmount: units.toString(), zarCents: usdcToZarCents(units, rate.zarPerUsdc), zarPerUsdc: rate.zarPerUsdc, feeBps };
+    return { usdcAmount: units.toString(), zarCents: usdcToZarCents(units, rate.zarPerUsdc), zarPerUsdc: rate.zarPerUsdc, feeBps: fees.topupFeeBps, minFeeZarCents: fees.minFeeZarCents };
   }
 
   async function withFloatLock<T>(fn: () => Promise<T>): Promise<T> {
@@ -105,8 +106,8 @@ export function createShopOwner(deps: { repo: OrderRepo; relayer: Relayer; shopK
   // ---- Cash top-ups
 
   /**
-   * Customer pays `zarCents` in cash; they receive USDC worth that amount minus the fee,
-   * sent from the shop's float.
+   * Customer pays `zarCents` in cash; they receive USDC worth that amount minus the fee
+   * (TOPUP_FEE_BPS, at least MIN_FEE_ZAR_CENTS), sent from the shop's float.
    */
   async function topUp(zarCents: number, customer: unknown): Promise<{ topUp: TopUp; confirmed: boolean; float: Float }> {
     if (typeof customer !== 'string' || !isAddress(customer)) throw new HttpError(400, "That isn't a valid customer code.", 'BAD_REQUEST');
@@ -115,7 +116,8 @@ export function createShopOwner(deps: { repo: OrderRepo; relayer: Relayer; shopK
 
     return withFloatLock(async () => {
       const { zarPerUsdc } = await getRate(fallbackZarPerUsdc);
-      const feeZarCents = Math.floor((zarCents * feeBps) / 10_000);
+      const feeZarCents = feeFor(zarCents, fees.topupFeeBps, fees.minFeeZarCents);
+      if (feeZarCents >= zarCents) throw new HttpError(400, `Amount is too small. The fee is at least R${(fees.minFeeZarCents / 100).toFixed(2)}.`, 'BAD_REQUEST');
       const usdcAmount = zarCentsToUsdc(zarCents - feeZarCents, zarPerUsdc);
       if (usdcAmount === 0n) throw new HttpError(400, 'Amount is too small.', 'BAD_REQUEST');
       await assertFloat(usdcAmount);
@@ -154,6 +156,8 @@ export function createShopOwner(deps: { repo: OrderRepo; relayer: Relayer; shopK
         if (!order) throw new HttpError(404, 'Order not found.', 'NOT_FOUND');
         if (order.status === 'REFUNDED') throw new HttpError(409, 'This order has already been refunded.', 'ALREADY_REFUNDED');
         if (order.status !== 'PAID') throw new HttpError(409, 'Only paid orders can be refunded.', 'NOT_PAID');
+        // The customer already has the cash, so sending the USDC back would pay them twice.
+        if (order.type === 'cashout') throw new HttpError(409, "Cash-outs can't be refunded.", 'NOT_REFUNDABLE');
         if (order.refundTxHash) throw new HttpError(409, 'A refund for this order is already being confirmed.', 'IN_PROGRESS');
         if (!order.payer || !isAddress(order.payer)) throw new HttpError(409, "This order has no payer to refund.", 'NO_PAYER');
 
