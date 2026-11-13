@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { Stack, router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/components/auth-gate';
@@ -111,6 +111,18 @@ export default function Home() {
 
   return (
     <View style={styles.flex}>
+      <Stack.Screen
+        options={{
+          headerRight: () =>
+            username ? (
+              <Pressable onPress={() => router.push('/profile')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Profile">
+                <View style={styles.profileButton}>
+                  <Text style={styles.profileInitial}>{username.slice(0, 1).toUpperCase()}</Text>
+                </View>
+              </Pressable>
+            ) : null,
+        }}
+      />
       <FlatList
         data={history ?? []}
         keyExtractor={(item, i) => `${item.txHash}-${i}`}
@@ -162,6 +174,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { padding: 20, gap: 16 },
   greeting: { fontSize: 22, fontWeight: '800', color: colors.fg },
+  profileButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  profileInitial: { fontSize: 18, fontWeight: '900', color: colors.fg },
   card: { backgroundColor: colors.card, borderRadius: 20, padding: 20, gap: 4 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   label: { fontSize: 18, color: colors.muted, fontWeight: '600' },

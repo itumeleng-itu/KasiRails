@@ -1,11 +1,16 @@
 import * as SecureStore from 'expo-secure-store';
 
-const HIDE_BALANCE_KEY = 'kasi-rails.hide-balance';
+import { activeAccount, settingKey } from './accounts';
 
+/** Whether the logged-in account hides its balance on Home. */
 export async function getHideBalance(): Promise<boolean> {
-  return (await SecureStore.getItemAsync(HIDE_BALANCE_KEY).catch(() => null)) === '1';
+  const account = activeAccount();
+  if (!account) return false;
+  return (await SecureStore.getItemAsync(settingKey(account.id, 'hide-balance')).catch(() => null)) === '1';
 }
 
 export async function setHideBalance(hidden: boolean): Promise<void> {
-  await SecureStore.setItemAsync(HIDE_BALANCE_KEY, hidden ? '1' : '0').catch(() => {});
+  const account = activeAccount();
+  if (!account) return;
+  await SecureStore.setItemAsync(settingKey(account.id, 'hide-balance'), hidden ? '1' : '0').catch(() => {});
 }

@@ -1,93 +1,164 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, AppState, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Fragment, createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { USERNAME_PATTERN, normalizeUsername } from '@kasi-rails/shared';
 
 import { PinPad } from '@/components/pin-pad';
 import { BigButton, colors } from '@/components/ui';
 import {
+  activate,
+  activeAccount,
+  deactivate,
+  getLastAccountId,
+  listAccounts,
+  migrateLegacyWallet,
+  removeAccount,
+  type AccountInfo,
+} from '@/lib/accounts';
+import {
   authenticateBiometric,
   checkUsername,
   getBiometricInfo,
-  getLocalUsername,
   getPinLength,
   hasPin,
   isBiometricsEnabled,
   pinLockoutRemaining,
-  registerUsername,
   resetPinAttempts,
-  restoreUsername,
+  resumeSignup,
   setBiometricsEnabled,
   setPin,
+  signUp,
   verifyPin,
   type BiometricInfo,
 } from '@/lib/auth';
+import { shortCode } from '@/lib/format';
 
 /** Lock again if the app was in the background for longer than this. */
 const RELOCK_AFTER_MS = 15_000;
 const MIN_PIN = 4;
 const MAX_PIN = 6;
 
-type Gate = 'loading' | 'register' | 'set-pin' | 'locked' | 'unlocked';
+type Screen =
+  | { kind: 'loading' }
+  | { kind: 'pick'; accounts: AccountInfo[] }
+  | { kind: 'signup'; canCancel: boolean }
+  | { kind: 'set-pin'; account: AccountInfo }
+  | { kind: 'unlock'; account: AccountInfo; canSwitch: boolean }
+  | { kind: 'ready' };
 
-const AuthContext = createContext<{ username: string | null }>({ username: null });
+interface AuthValue {
+  account: AccountInfo | null;
+  username: string | null;
+  /** Locks this account and shows the account picker. */
+  logout: () => void;
+  /** Deletes the logged-in account and its wallet from this phone. */
+  removeCurrentAccount: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthValue>({ account: null, username: null, logout: () => {}, removeCurrentAccount: async () => {} });
 
 export function useAuth() {
   return useContext(AuthContext);
 }
 
 /**
- * Covers the app until the user has registered a username, set a PIN, and unlocked
- * with Face ID / fingerprint or the PIN. The app underneath stays mounted.
+ * Covers the app until someone logs in: pick an account (or create one), then unlock it
+ * with Face ID / fingerprint or its PIN. The app below is re-created for each account.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
-  const [gate, setGate] = useState<Gate>('loading');
-  const [username, setUsername] = useState<string | null>(null);
+  const [screen, setScreen] = useState<Screen>({ kind: 'loading' });
+  const [account, setAccount] = useState<AccountInfo | null>(null);
   const backgroundedAt = useRef<number | null>(null);
+
+  /** Where to go when nobody is logged in. */
+  const showStart = useCallback(async () => {
+    const accounts = await listAccounts();
+    if (accounts.length === 0) return setScreen({ kind: 'signup', canCancel: false });
+    const lastId = await getLastAccountId();
+    const last = accounts.find((a) => a.id === lastId);
+    if (last) return setScreen({ kind: 'unlock', account: last, canSwitch: true });
+    setScreen(accounts.length === 1 ? { kind: 'unlock', account: accounts[0], canSwitch: true } : { kind: 'pick', accounts });
+  }, []);
 
   useEffect(() => {
     (async () => {
-      const name = (await getLocalUsername()) ?? (await restoreUsername());
-      setUsername(name);
-      if (!name) return setGate('register');
-      setGate((await hasPin()) ? 'locked' : 'set-pin');
-    })().catch(() => setGate('register'));
+      await migrateLegacyWallet().catch(() => {});
+      const resumed = await resumeSignup();
+      if (resumed) return setScreen({ kind: 'set-pin', account: resumed });
+      await showStart();
+    })().catch(() => setScreen({ kind: 'signup', canCancel: false }));
+  }, [showStart]);
+
+  const enter = useCallback(async (info: AccountInfo) => {
+    await activate(info);
+    setAccount(info);
+    setScreen({ kind: 'ready' });
   }, []);
 
-  // Lock when the app comes back after a while in the background.
+  // Lock (not log out) when the app comes back after a while in the background.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'background') backgroundedAt.current = Date.now();
       if (state === 'active' && backgroundedAt.current !== null) {
         const away = Date.now() - backgroundedAt.current;
         backgroundedAt.current = null;
-        if (away > RELOCK_AFTER_MS) setGate((g) => (g === 'unlocked' ? 'locked' : g));
+        const current = activeAccount();
+        if (away > RELOCK_AFTER_MS && current) setScreen((s) => (s.kind === 'ready' ? { kind: 'unlock', account: current, canSwitch: true } : s));
       }
     });
     return () => sub.remove();
   }, []);
 
+  const logout = useCallback(() => {
+    deactivate();
+    setAccount(null);
+    listAccounts().then((accounts) => setScreen({ kind: 'pick', accounts }));
+  }, []);
+
+  const removeCurrentAccount = useCallback(async () => {
+    const current = activeAccount();
+    if (!current) return;
+    await removeAccount(current.id);
+    setAccount(null);
+    await showStart();
+  }, [showStart]);
+
+  const value: AuthValue = { account, username: account?.username ?? null, logout, removeCurrentAccount };
+
   return (
-    <AuthContext.Provider value={{ username }}>
+    <AuthContext.Provider value={value}>
       <View style={styles.flex}>
-        {children}
-        {gate !== 'unlocked' ? (
+        {/* Re-created per account so no screen or data carries over between accounts. */}
+        <Fragment key={account?.id ?? 'none'}>{children}</Fragment>
+        {screen.kind !== 'ready' ? (
           <View style={styles.cover}>
-            {gate === 'loading' ? (
+            {screen.kind === 'loading' ? (
               <View style={styles.center}>
                 <ActivityIndicator size="large" color={colors.fg} />
               </View>
             ) : null}
-            {gate === 'register' ? (
-              <Register
-                onDone={(name) => {
-                  setUsername(name);
-                  setGate('set-pin');
-                }}
+            {screen.kind === 'pick' ? (
+              <Pick
+                accounts={screen.accounts}
+                onPick={(a) => setScreen({ kind: 'unlock', account: a, canSwitch: true })}
+                onAdd={() => setScreen({ kind: 'signup', canCancel: true })}
               />
             ) : null}
-            {gate === 'set-pin' ? <SetPin onDone={() => setGate('unlocked')} /> : null}
-            {gate === 'locked' ? <Unlock username={username} onDone={() => setGate('unlocked')} /> : null}
+            {screen.kind === 'signup' ? (
+              <SignUp
+                onDone={(a) => setScreen({ kind: 'set-pin', account: a })}
+                onCancel={screen.canCancel ? () => listAccounts().then((accounts) => setScreen({ kind: 'pick', accounts })) : undefined}
+              />
+            ) : null}
+            {screen.kind === 'set-pin' ? <SetPin account={screen.account} onDone={() => enter(screen.account)} /> : null}
+            {screen.kind === 'unlock' ? (
+              <Unlock
+                key={screen.account.id}
+                account={screen.account}
+                onDone={() => (activeAccount()?.id === screen.account.id ? setScreen({ kind: 'ready' }) : enter(screen.account))}
+                onSwitch={screen.canSwitch ? () => listAccounts().then((accounts) => setScreen({ kind: 'pick', accounts })) : undefined}
+              />
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -95,9 +166,40 @@ export function AuthGate({ children }: { children: ReactNode }) {
   );
 }
 
-// ---- Create account: choose a unique username
+// ---- Who's using the app?
 
-function Register({ onDone }: { onDone: (username: string) => void }) {
+function Pick({ accounts, onPick, onAdd }: { accounts: AccountInfo[]; onPick: (a: AccountInfo) => void; onAdd: () => void }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <ScrollView contentContainerStyle={[styles.page, { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 }]}>
+      <Text style={styles.brand}>Kasi Rails</Text>
+      <Text style={styles.title}>Who's using Kasi Rails?</Text>
+      {accounts.map((a) => (
+        <Pressable
+          key={a.id}
+          onPress={() => onPick(a)}
+          accessibilityRole="button"
+          accessibilityLabel={`Log in as ${a.username}`}
+          style={({ pressed }) => [styles.accountRow, pressed && styles.pressed]}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{a.username.slice(0, 1).toUpperCase()}</Text>
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.accountName}>@{a.username}</Text>
+            <Text style={styles.accountCode}>{shortCode(a.address)}</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </Pressable>
+      ))}
+      <View style={styles.spacer} />
+      <BigButton label="Add another account" variant="secondary" onPress={onAdd} />
+    </ScrollView>
+  );
+}
+
+// ---- Create an account: new wallet + unique username
+
+function SignUp({ onDone, onCancel }: { onDone: (a: AccountInfo) => void; onCancel?: () => void }) {
   const insets = useSafeAreaInsets();
   const [input, setInput] = useState('');
   const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null);
@@ -126,7 +228,7 @@ function Register({ onDone }: { onDone: (username: string) => void }) {
     setBusy(true);
     setError(null);
     try {
-      onDone(await registerUsername(name));
+      onDone(await signUp(name));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create your account.');
       setBusy(false);
@@ -138,7 +240,7 @@ function Register({ onDone }: { onDone: (username: string) => void }) {
       <ScrollView contentContainerStyle={[styles.page, { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 }]} keyboardShouldPersistTaps="handled">
         <Text style={styles.brand}>Kasi Rails</Text>
         <Text style={styles.title}>Create your account</Text>
-        <Text style={styles.body}>Choose a username. Shops and friends will see it.</Text>
+        <Text style={styles.body}>Choose a username. Shops and friends will see it. Each account has its own money.</Text>
         <View style={styles.inputRow}>
           <Text style={styles.at}>@</Text>
           <TextInput
@@ -159,6 +261,7 @@ function Register({ onDone }: { onDone: (username: string) => void }) {
         </Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <BigButton label="Create account" onPress={submit} busy={busy} disabled={!valid || status?.ok === false} />
+        {onCancel ? <BigButton label="Back" variant="secondary" onPress={onCancel} /> : null}
         <Text style={styles.note}>Your money stays on this phone. Test network only: there is no backup yet, so don't delete the app.</Text>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -167,7 +270,7 @@ function Register({ onDone }: { onDone: (username: string) => void }) {
 
 // ---- Choose a PIN, then optionally turn on Face ID / fingerprint
 
-function SetPin({ onDone }: { onDone: () => void }) {
+function SetPin({ account, onDone }: { account: AccountInfo; onDone: () => void }) {
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState<'enter' | 'confirm' | 'biometrics'>('enter');
   const [first, setFirst] = useState('');
@@ -194,19 +297,20 @@ function SetPin({ onDone }: { onDone: () => void }) {
       setMessage("The PINs didn't match. Try again.");
       return;
     }
-    await setPin(pin);
+    await setPin(account.id, pin);
     if (bio?.available) setStep('biometrics');
     else onDone();
   };
 
   const enableBiometrics = async () => {
-    if (await authenticateBiometric(`Turn on ${bio?.label ?? 'fingerprint'}`)) await setBiometricsEnabled(true);
+    if (await authenticateBiometric(`Turn on ${bio?.label ?? 'fingerprint'}`)) await setBiometricsEnabled(account.id, true);
     onDone();
   };
 
+  const pad = { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 };
   if (step === 'biometrics' && bio) {
     return (
-      <View style={[styles.page, styles.flex, { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 }]}>
+      <View style={[styles.page, styles.flex, pad]}>
         <Text style={styles.title}>Unlock with {bio.label}?</Text>
         <Text style={styles.body}>You can always use your PIN instead.</Text>
         <View style={styles.spacer} />
@@ -217,9 +321,10 @@ function SetPin({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <View style={[styles.page, styles.flex, { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 }]}>
+    <View style={[styles.page, styles.flex, pad]}>
+      <Text style={styles.brand}>@{account.username}</Text>
       <Text style={styles.title}>{step === 'enter' ? 'Choose a PIN' : 'Enter it again'}</Text>
-      <Text style={styles.body}>{step === 'enter' ? `${MIN_PIN} to ${MAX_PIN} numbers. You'll use it to open the app.` : 'To make sure it’s right.'}</Text>
+      <Text style={styles.body}>{step === 'enter' ? `${MIN_PIN} to ${MAX_PIN} numbers. You'll use it to log in.` : 'To make sure it’s right.'}</Text>
       {message ? <Text style={styles.error}>{message}</Text> : null}
       <View style={styles.spacer} />
       <PinPad value={pin} maxLength={step === 'confirm' ? first.length : MAX_PIN} onChange={setPinValue} />
@@ -228,9 +333,9 @@ function SetPin({ onDone }: { onDone: () => void }) {
   );
 }
 
-// ---- Unlock: Face ID / fingerprint first, PIN as fallback
+// ---- Log in: Face ID / fingerprint first, PIN as fallback
 
-function Unlock({ username, onDone }: { username: string | null; onDone: () => void }) {
+function Unlock({ account, onDone, onSwitch }: { account: AccountInfo; onDone: () => void; onSwitch?: () => void }) {
   const insets = useSafeAreaInsets();
   const [pin, setPinValue] = useState('');
   const [length, setLength] = useState(4);
@@ -238,25 +343,28 @@ function Unlock({ username, onDone }: { username: string | null; onDone: () => v
   const [lockedMs, setLockedMs] = useState(0);
   const [bio, setBio] = useState<BiometricInfo | null>(null);
   const [checking, setChecking] = useState(false);
+  const [needsPin, setNeedsPin] = useState(false);
 
   const tryBiometric = useCallback(async () => {
-    if (await authenticateBiometric()) {
-      await resetPinAttempts();
+    if (await authenticateBiometric(`Log in as @${account.username}`)) {
+      await resetPinAttempts(account.id);
       onDone();
     }
-  }, [onDone]);
+  }, [account, onDone]);
 
   useEffect(() => {
     (async () => {
-      setLength(await getPinLength());
-      setLockedMs(await pinLockoutRemaining());
-      const [info, enabled] = await Promise.all([getBiometricInfo(), isBiometricsEnabled()]);
+      // An account whose PIN was never set (e.g. sign-up interrupted) sets one now.
+      if (!(await hasPin(account.id))) return setNeedsPin(true);
+      setLength(await getPinLength(account.id));
+      setLockedMs(await pinLockoutRemaining(account.id));
+      const [info, enabled] = await Promise.all([getBiometricInfo(), isBiometricsEnabled(account.id)]);
       if (info.available && enabled) {
         setBio(info);
         tryBiometric();
       }
     })();
-  }, [tryBiometric]);
+  }, [account, tryBiometric]);
 
   // Count down a lockout.
   useEffect(() => {
@@ -265,12 +373,14 @@ function Unlock({ username, onDone }: { username: string | null; onDone: () => v
     return () => clearInterval(t);
   }, [lockedMs]);
 
+  if (needsPin) return <SetPin account={account} onDone={onDone} />;
+
   const onChange = async (value: string) => {
     setPinValue(value);
     setMessage(null);
     if (value.length < length) return;
     setChecking(true);
-    const result = await verifyPin(value);
+    const result = await verifyPin(account.id, value);
     setChecking(false);
     if (result.ok) return onDone();
     setPinValue('');
@@ -282,7 +392,7 @@ function Unlock({ username, onDone }: { username: string | null; onDone: () => v
   return (
     <View style={[styles.page, styles.flex, { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 }]}>
       <Text style={styles.brand}>Kasi Rails</Text>
-      <Text style={styles.title}>{username ? `Welcome back, @${username}` : 'Welcome back'}</Text>
+      <Text style={styles.title}>Welcome back, @{account.username}</Text>
       <Text style={[styles.body, (message || locked) && { color: colors.danger }]}>
         {locked ? `Too many wrong PINs. Try again in ${Math.ceil(lockedMs / 1000)} seconds.` : message ?? 'Enter your PIN'}
       </Text>
@@ -294,6 +404,11 @@ function Unlock({ username, onDone }: { username: string | null; onDone: () => v
         disabled={locked || checking}
         extra={bio ? { label: bio.label, onPress: tryBiometric } : undefined}
       />
+      {onSwitch ? (
+        <Pressable onPress={onSwitch} accessibilityRole="button" style={styles.link}>
+          <Text style={styles.linkText}>Not @{account.username}? Switch account</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -313,4 +428,13 @@ const styles = StyleSheet.create({
   hint: { fontSize: 16, color: colors.muted, minHeight: 22 },
   error: { fontSize: 17, color: colors.danger },
   note: { fontSize: 14, color: colors.muted, lineHeight: 20, marginTop: 8 },
+  accountRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: 16, backgroundColor: colors.card },
+  pressed: { opacity: 0.7 },
+  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 22, fontWeight: '800', color: colors.fg },
+  accountName: { fontSize: 20, fontWeight: '700', color: colors.fg },
+  accountCode: { fontSize: 14, color: colors.muted },
+  chevron: { fontSize: 32, color: colors.muted },
+  link: { alignSelf: 'center', paddingVertical: 10 },
+  linkText: { fontSize: 16, fontWeight: '700', color: colors.primary },
 });
