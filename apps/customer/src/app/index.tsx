@@ -3,6 +3,7 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'rea
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useAuth } from '@/components/auth-gate';
 import { ArrowIcon, EyeIcon } from '@/components/icons';
 import { BigButton, colors } from '@/components/ui';
 import { usdcToZarCents } from '@kasi-rails/shared';
@@ -24,6 +25,7 @@ interface Money {
 
 export default function Home() {
   const insets = useSafeAreaInsets();
+  const { username } = useAuth();
   const [balance, setBalance] = useState<Money | null>(null);
   const [history, setHistory] = useState<HistoryItem[] | null>(null);
   const [hidden, setHidden] = useState(false);
@@ -74,6 +76,7 @@ export default function Home() {
 
   const header = (
     <View style={styles.header}>
+      {username ? <Text style={styles.greeting}>Hi @{username}</Text> : null}
       <View style={styles.card}>
         <View style={styles.cardTop}>
           <Text style={styles.label}>Your money</Text>
@@ -158,6 +161,7 @@ function HistoryRow({ item, hidden }: { item: HistoryItem; hidden: boolean }) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { padding: 20, gap: 16 },
+  greeting: { fontSize: 22, fontWeight: '800', color: colors.fg },
   card: { backgroundColor: colors.card, borderRadius: 20, padding: 20, gap: 4 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   label: { fontSize: 18, color: colors.muted, fontWeight: '600' },

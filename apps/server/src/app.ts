@@ -64,7 +64,15 @@ export function createApp(deps: { config: Config; repo: OrderRepo; payments: Pay
   }
 
   app.get('/health', (_req, res) => {
-    res.json({ ok: true, shopName: config.shopName, apiUrl: publicUrl(config.port, config.publicUrlOverride), store: repo.kind, time: new Date().toISOString() });
+    res.json({
+      ok: true,
+      shopName: config.shopName,
+      apiUrl: publicUrl(config.port, config.publicUrlOverride),
+      store: repo.kind,
+      // Set by Render (or RAILWAY_GIT_COMMIT_SHA on Railway); shows which commit is deployed.
+      commit: (process.env.RENDER_GIT_COMMIT ?? process.env.RAILWAY_GIT_COMMIT_SHA)?.slice(0, 7),
+      time: new Date().toISOString(),
+    });
   });
 
   app.get('/rate', async (_req, res) => {

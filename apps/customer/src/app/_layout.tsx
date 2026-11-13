@@ -1,11 +1,12 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { AuthGate } from '@/components/auth-gate';
 import { colors } from '@/components/ui';
 
 export default function RootLayout() {
   return (
-    <>
+    <AuthGate>
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
@@ -18,6 +19,6 @@ export default function RootLayout() {
         <Stack.Screen name="pay" options={{ title: 'Pay' }} />
         <Stack.Screen name="receive" options={{ title: 'Receive money' }} />
       </Stack>
-    </>
+    </AuthGate>
   );
 }

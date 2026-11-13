@@ -28,6 +28,11 @@ function getAccount(): Promise<PrivateKeyAccount> {
   return accountPromise;
 }
 
+/** Signs a plain-text message (EIP-191), e.g. to prove ownership when registering a username. */
+export async function signMessage(message: string): Promise<Hex> {
+  return (await getAccount()).signMessage({ message });
+}
+
 /** Creates the wallet on first launch; returns this device's address. */
 export async function getAddress(): Promise<Hex> {
   return (await getAccount()).address;
