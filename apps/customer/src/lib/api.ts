@@ -101,13 +101,12 @@ export async function getRate(api = API_URL): Promise<{ zarPerUsdc: number; sour
   return (await request<{ zarPerUsdc: number; source: 'valr' | 'fallback' }>(api, '/rate')).body;
 }
 
-/** Finds a registered user by username; null if nobody has it. */
-export async function lookupUser(username: string): Promise<{ username: string; address: Hex } | null> {
+/** The username registered for a wallet, if any. */
+export async function lookupAddress(address: string): Promise<string | null> {
   try {
-    return (await request<{ username: string; address: Hex }>(API_URL, `/users/${encodeURIComponent(username)}`)).body;
-  } catch (err) {
-    if (err instanceof ApiError && (err.status === 404 || err.status === 400)) return null;
-    throw err;
+    return (await request<{ username: string }>(API_URL, `/users/by-address/${address}`)).body.username;
+  } catch {
+    return null;
   }
 }
 

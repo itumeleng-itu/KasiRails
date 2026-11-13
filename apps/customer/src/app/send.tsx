@@ -1,25 +1,29 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Hex } from 'viem';
-import { USERNAME_PATTERN, normalizeUsername, usdcToZarCents, zarCentsToUsdc } from '@kasi-rails/shared';
+import { getAddress as checksum, isAddress, type Hex } from 'viem';
+import { usdcToZarCents, zarCentsToUsdc } from '@kasi-rails/shared';
 
-import { useAuth } from '@/components/auth-gate';
 import { Keypad, entryToCents, pressKey } from '@/components/keypad';
 import { Success } from '@/components/success';
 import { BigButton, Message, colors } from '@/components/ui';
-import { API_URL, ApiError, getRate, getUsdcDomain, lookupUser, sendTransfer } from '@/lib/api';
+import { API_URL, ApiError, getRate, getUsdcDomain, lookupAddress, sendTransfer } from '@/lib/api';
 import { readUsdcBalance } from '@/lib/chain';
-import { formatRand } from '@/lib/format';
+import { formatRand, shortCode } from '@/lib/format';
 import { getAddress, signTransfer } from '@/lib/wallet';
 
 const MAX_CENTS = 10_000_00; // R10,000, matches the server's per-payment cap at typical rates
 
 interface Recipient {
-  username: string;
   address: Hex;
+  /** Set when the wallet belongs to a registered Kasi Rails user. */
+  username?: string;
 }
+
+/** "@lerato" for Kasi Rails users, otherwise the wallet's short code. */
+const nameOf = (to: Recipient) => (to.username ? `@${to.username}` : shortCode(to.address));
 
 type Step =
   | { kind: 'who' }
@@ -38,7 +42,7 @@ export default function Send() {
     return (
       <Success
         zarCents={step.zarCents}
-        message={step.confirmed ? `Sent to @${step.to.username}` : `Sent to @${step.to.username}. It will arrive in a moment.`}
+        message={step.confirmed ? `Sent to ${nameOf(step.to)}` : `Sent to ${nameOf(step.to)}. It will arrive in a moment.`}
         onDone={() => router.back()}
       />
     );
@@ -54,63 +58,64 @@ export default function Send() {
   );
 }
 
-// ---- Who are you sending to?
+// ---- Who are you sending to? (their wallet address)
 
 function Who({ onNext }: { onNext: (to: Recipient) => void }) {
-  const { username: me } = useAuth();
   const [input, setInput] = useState('');
   const [found, setFound] = useState<Recipient | null>(null);
   const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null);
-  const name = normalizeUsername(input);
-  const valid = USERNAME_PATTERN.test(name);
+  const text = input.trim().replace(/^ethereum:/i, '');
 
-  // Look the username up shortly after the user stops typing.
+  // Check the address shortly after it changes, and show the owner's username if they have one.
   useEffect(() => {
     setFound(null);
     setStatus(null);
-    if (!valid) return;
-    if (name === me) {
-      setStatus({ text: "That's you. Choose someone else.", ok: false });
+    if (!text) return;
+    if (!isAddress(text)) {
+      setStatus({ text: 'That isn’t a wallet address. It starts with 0x and has 42 characters.', ok: false });
       return;
     }
     let cancelled = false;
-    const t = setTimeout(() => {
-      lookupUser(name)
-        .then((user) => {
-          if (cancelled) return;
-          if (user) {
-            setFound(user);
-            setStatus({ text: `✓ @${user.username}`, ok: true });
-          } else {
-            setStatus({ text: `No one has the username @${name}`, ok: false });
-          }
-        })
-        .catch(() => !cancelled && setStatus({ text: "Couldn't check. Check your internet.", ok: false }));
-    }, 400);
+    const t = setTimeout(async () => {
+      const address = checksum(text) as Hex;
+      if (address === (await getAddress())) {
+        if (!cancelled) setStatus({ text: "That's your own wallet.", ok: false });
+        return;
+      }
+      const username = await lookupAddress(address);
+      if (cancelled) return;
+      setFound({ address, username: username ?? undefined });
+      setStatus({ text: username ? `✓ @${username}` : `✓ Wallet ${shortCode(address)}`, ok: true });
+    }, 300);
     return () => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [name, valid, me]);
+  }, [text]);
+
+  const paste = async () => {
+    const value = await Clipboard.getStringAsync();
+    if (value) setInput(value.trim());
+  };
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.page}>
         <Text style={styles.title}>Who are you sending to?</Text>
+        <Text style={styles.body}>Paste their wallet address. They can copy it from their Profile or Receive screen.</Text>
         <View style={styles.inputRow}>
-          <Text style={styles.at}>@</Text>
           <TextInput
             value={input}
             onChangeText={setInput}
-            placeholder="username"
+            placeholder="0x…"
             autoCapitalize="none"
             autoCorrect={false}
-            autoFocus
-            maxLength={21}
-            returnKeyType="next"
-            onSubmitEditing={() => found && onNext(found)}
+            multiline
             style={styles.input}
           />
+          <Pressable onPress={paste} accessibilityRole="button" accessibilityLabel="Paste" style={({ pressed }) => [styles.paste, pressed && styles.pressed]}>
+            <Text style={styles.pasteText}>Paste</Text>
+          </Pressable>
         </View>
         <Text style={[styles.hint, status && { color: status.ok ? colors.success : colors.danger }]}>{status?.text ?? ' '}</Text>
         <View style={styles.spacer} />
@@ -147,7 +152,7 @@ function Amount({ to, onNext }: { to: Recipient; onNext: (zarCents: number, usdc
 
   return (
     <View style={[styles.page, { paddingBottom: 16 + insets.bottom }]}>
-      <Text style={styles.prompt}>How much are you sending to @{to.username}?</Text>
+      <Text style={styles.prompt}>How much are you sending to {nameOf(to)}?</Text>
       <Text style={styles.entry} adjustsFontSizeToFit numberOfLines={1}>
         R{entry || '0'}
       </Text>
@@ -187,7 +192,7 @@ function Confirm({ step, setStep }: { step: Extract<Step, { kind: 'confirm' }>; 
       <Text style={styles.amount} adjustsFontSizeToFit numberOfLines={1}>
         {formatRand(step.zarCents)}
       </Text>
-      <Text style={styles.question}>to @{step.to.username}?</Text>
+      <Text style={styles.question}>to {nameOf(step.to)}?</Text>
       <View style={styles.buttons}>
         <BigButton label={step.sending ? 'Sending…' : 'Send'} onPress={send} busy={step.sending} />
         {!step.sending ? <BigButton label="Change amount" variant="secondary" onPress={() => setStep({ kind: 'amount', to: step.to })} /> : null}
@@ -207,10 +212,13 @@ const styles = StyleSheet.create({
   buttons: { alignSelf: 'stretch', gap: 12, marginTop: 16 },
   spacer: { flex: 1 },
   title: { fontSize: 24, fontWeight: '800', color: colors.fg },
+  body: { fontSize: 16, color: colors.muted, lineHeight: 22 },
   prompt: { fontSize: 19, fontWeight: '700', color: colors.fg },
-  inputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderColor: colors.fg, borderRadius: 14, paddingHorizontal: 14 },
-  at: { fontSize: 22, fontWeight: '800', color: colors.muted },
-  input: { flex: 1, fontSize: 22, paddingVertical: 12, paddingHorizontal: 6, color: colors.fg },
+  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 2, borderColor: colors.fg, borderRadius: 14, paddingLeft: 14, paddingRight: 8 },
+  input: { flex: 1, fontSize: 17, paddingVertical: 12, color: colors.fg },
+  paste: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.primary },
+  pasteText: { fontSize: 16, fontWeight: '800', color: colors.fg },
+  pressed: { opacity: 0.6 },
   hint: { fontSize: 16, color: colors.muted, minHeight: 22 },
   entry: { fontSize: 56, fontWeight: '900', color: colors.fg, textAlign: 'center', fontVariant: ['tabular-nums'] },
   mutedCenter: { fontSize: 17, color: colors.muted, textAlign: 'center' },
