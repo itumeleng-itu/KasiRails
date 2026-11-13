@@ -22,6 +22,30 @@ The shop is both the till and the ramp.
 - **Buy USDC with cash.** The shop sells USDC from its float to cash customers, for a small fee.
 - **Till income becomes float.** USDC taken at the till is the float for the next cash customer. A bank is only needed to rebalance.
 
+## Try it
+
+The server runs on Render: **https://kasi-rails.onrender.com**
+
+- Till: https://kasi-rails.onrender.com/vendor/till.html
+- Cash top-up: https://kasi-rails.onrender.com/vendor/topup.html (owner PIN)
+- Merchant view: https://kasi-rails.onrender.com/vendor/today.html (owner PIN)
+- Customer app: run it in Expo Go (see [Getting started](#getting-started)); it talks to the hosted server by default.
+
+The free Render plan sleeps after 15 minutes without traffic. If a page is slow to open, wait about a minute while it wakes up.
+
+**Demo video:** link coming soon.
+
+## Features
+
+- **Pay at the till, gasless.** The shop keys in rand and shows a QR; the customer confirms in the app and the till turns green with the amount. The customer never needs ETH: our relayer submits the signed USDC authorization and pays gas.
+- **Automatic matching.** Each payment's EIP-3009 nonce is `keccak256(orderId)`, so a payment can only ever settle the order it was signed for.
+- **Late payments and expiry.** Unpaid orders expire after `ORDER_TTL_SECONDS`. A payment that confirms after its order expired is still recorded as PAID, and a background sweep finishes payments whose confirmation was slow.
+- **Cash top-up.** A customer with only cash pays the shop; the shop sends USDC from its float to the customer's app, minus a small fee (`TOPUP_FEE_BPS`).
+- **Refunds.** The shop owner can refund a paid sale in full from the float. Refunds are PIN-protected and can't be sent twice.
+- **Merchant view (`today.html`).** Today's sales, top-ups, fees, float and expected cash, with every order's status (PAID, PENDING, EXPIRED, REFUNDED), payer, Basescan links and a Refund button. Refreshes every 5 seconds.
+- **Customer accounts.** Each account has its own wallet on the phone and a unique @username, proven by a wallet signature. The app unlocks with a PIN or Face ID / fingerprint, and several people can have accounts on one phone.
+- **Send money** to any wallet address, and see all activity, named by shop or @username, on the home screen.
+
 ## How it works
 
 1. The shop keys in an amount in rand on the till page. The backend creates an order priced at the live USDC/ZAR rate and shows it as a QR code.
@@ -116,8 +140,20 @@ Fund the wallets on Base Sepolia:
 - Customer app (Expo SDK 58, runs in Expo Go):
   1. Copy `apps/customer/.env.example` to `apps/customer/.env`. It points the app at the hosted server, https://kasi-rails.onrender.com, which works from any network. Alternatively, leave `EXPO_PUBLIC_API_URL` empty and run the server on the same computer as Expo. The app finds it automatically (same host as Expo, port 3000), and the till puts the computer's network address in its QR codes, so the till can be opened at `localhost`. The phone must be on the same network as the computer. To use a server elsewhere, set `EXPO_PUBLIC_API_URL` in `apps/customer/.env` (see `.env.example`); to override the address in till QR codes, set `PUBLIC_URL` in the root `.env`.
   2. `npm run dev:app`, then scan the QR code in the terminal with Expo Go (Android) or the Camera app (iOS).
-  3. On first launch the app creates a key on the phone (stored in secure storage, never sent anywhere). Tap **Receive** to see the code, and fund it with USDC from [faucet.circle.com](https://faucet.circle.com) for testing.
+  3. On first launch, create an account: the app makes a wallet on the phone (kept in secure storage, never sent anywhere), you choose a @username and a PIN. Fund it with a cash top-up at the shop's top-up page, or send USDC from [faucet.circle.com](https://faucet.circle.com) to the address shown under **Receive**.
   4. On the till page charge an amount, then tap **Pay** in the app and scan the till's QR code.
+- Merchant view: open `/vendor/today.html` (or **Today** in the navigation), enter the `OWNER_PIN`, and see today's sales and top-ups. Tap **Refund** on a paid sale to send the money back to the customer.
+
+### Tests
+
+The API tests run against a running server:
+
+```sh
+npm run dev:server   # in one terminal
+npm test             # in another: node --test "apps/server/tests/*.test.mjs"
+```
+
+They create a few small test orders (which simply expire) and check the health check, the USDC domain, order creation, and that malformed or forged signatures can't pay an order.
 
 ### Deploy the server (Render)
 
@@ -137,13 +173,14 @@ The same `Dockerfile` also works on Railway or any Docker host (Railway's `RAILW
 - [x] Milestone 1: scaffold, shared package, wallet tools
 - [x] Milestone 2: gasless payment spike ([first transfer on Base Sepolia](https://sepolia.basescan.org/tx/0xa3805a9eba443c28d0b35bad5bcc02793c19334a1e03d7a992e9e5de56d27b3a))
 - [x] Milestone 3: server API and till page
-- [ ] Milestone 4: customer app, end to end
+- [x] Milestone 4: customer app, end to end ([payment from the app](https://sepolia.basescan.org/tx/0x6d75ec6dadbe8def4a80b56776ceab479223a8f9567f0a1a0238bbb1620aa5ac))
+- [x] Cash top-up, refunds and merchant view
+- [x] Customer accounts: @usernames, PIN and biometric unlock, several accounts per phone
 
 ## Roadmap
 
-- Refunds and late payments
-- Cash top-up
-- Merchant dashboard
+- Wallet backup and recovery (so a lost phone doesn't mean lost money)
+- Installed app builds with Face ID
 - Sepedi and isiZulu voice confirmation
 - Passkey wallets
 - ZARP (rand stablecoin)
@@ -159,6 +196,7 @@ Link coming soon.
 - Matome Tjale (team lead)
 - Halaletsang Malefahlo
 - Ntokozo Nkambule
+- Thembalethu Brilliant
 
 ## Testnet only
 

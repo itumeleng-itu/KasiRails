@@ -14,7 +14,8 @@
     "gen-wallet": "npm run gen-wallet -w @kasi-rails/server",
     "setup:wallets": "tsx apps/server/scripts/setup-wallets.ts",
     "spike": "tsx apps/server/scripts/spike-eip3009.ts",
-    "dev:app": "npm run start -w @kasi-rails/customer"
+    "dev:app": "npm run start -w @kasi-rails/customer",
+    "test": "node --test \"apps/server/tests/*.test.mjs\""
   },
   "engines": {
     "node": ">=22"
