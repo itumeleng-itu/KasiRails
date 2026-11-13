@@ -24,3 +24,10 @@ export interface TopUp {
   txHash: string;
   createdAt: string;
 }
+
+/** A registered customer: unique lowercase username for one wallet address. */
+export interface User {
+  username: string;
+  address: string;
+  createdAt: string;
+}

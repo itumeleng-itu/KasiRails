@@ -32,3 +32,16 @@ export function usdcToZarCents(usdc: bigint, zarPerUsdc: number): number {
 export function orderIdToNonce(orderId: string): Hex {
   return keccak256(stringToBytes(orderId));
 }
+
+/** Usernames are 3-20 characters: lowercase letters, digits and underscores. */
+export const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
+
+/** Lowercases, trims and drops a leading "@". */
+export function normalizeUsername(input: string): string {
+  return input.trim().replace(/^@/, '').toLowerCase();
+}
+
+/** The exact message a wallet signs to register a username. */
+export function registrationMessage(username: string, address: string, issuedAt: string): string {
+  return `Kasi Rails registration\nUsername: @${username}\nAddress: ${address}\nIssued at: ${issuedAt}`;
+}

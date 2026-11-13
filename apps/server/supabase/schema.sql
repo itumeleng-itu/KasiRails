@@ -37,3 +37,13 @@ create table if not exists public.topups (
 create index if not exists topups_created_at_idx on public.topups (created_at desc);
 
 alter table public.topups enable row level security;
+
+-- Registered customers: a unique public username for each wallet address.
+-- Registration is proven by a signature from the wallet (see POST /users).
+create table if not exists public.users (
+  username    text primary key check (username ~ '^[a-z0-9_]{3,20}$'),
+  address     text not null unique,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.users enable row level security;

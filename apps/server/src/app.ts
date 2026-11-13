@@ -13,6 +13,7 @@ import type { OrderRepo } from './repo';
 import { createRequire } from 'node:module';
 import { publicUrl } from './network';
 import type { TopUps } from './topups';
+import { createUsersRouter } from './users';
 import { ROOT_DIR } from './paths';
 
 const PUBLIC_DIR = resolve(ROOT_DIR, 'apps/server/public');
@@ -147,6 +148,8 @@ export function createApp(deps: { config: Config; repo: OrderRepo; payments: Pay
   });
 
   // Vendor pages. The QR is drawn server-side as SVG; the page decides its content.
+  app.use('/users', createUsersRouter(repo));
+
   // ---- Shop owner: cash top-ups (PIN in the x-owner-pin header)
   app.post('/owner/check-pin', (req, res) => {
     topUps.checkPin(req.get('x-owner-pin'));

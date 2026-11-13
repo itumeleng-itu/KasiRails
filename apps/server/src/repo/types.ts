@@ -1,4 +1,4 @@
-import type { Order, OrderStatus, TopUp } from '@kasi-rails/shared';
+import type { Order, OrderStatus, TopUp, User } from '@kasi-rails/shared';
 
 /** Fields that change after creation. `null` clears an optional field. */
 export interface OrderPatch {
@@ -25,4 +25,11 @@ export interface OrderRepo {
   createTopUp(topUp: TopUp): Promise<void>;
   /** Top-ups created at or after `since`, newest first. */
   listTopUpsSince(since: Date): Promise<TopUp[]>;
+  /** Throws UsernameTakenError / AddressRegisteredError on conflicts. */
+  createUser(user: User): Promise<void>;
+  getUserByUsername(username: string): Promise<User | null>;
+  getUserByAddress(address: string): Promise<User | null>;
 }
+
+export class UsernameTakenError extends Error {}
+export class AddressRegisteredError extends Error {}

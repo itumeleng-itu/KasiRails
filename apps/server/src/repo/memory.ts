@@ -1,5 +1,5 @@
-import type { Order, OrderStatus, TopUp } from '@kasi-rails/shared';
-import type { OrderPatch, OrderRepo } from './types';
+import type { Order, OrderStatus, TopUp, User } from '@kasi-rails/shared';
+import { AddressRegisteredError, UsernameTakenError, type OrderPatch, type OrderRepo } from './types';
 
 function applyPatch(order: Order, patch: OrderPatch): Order {
   const next: Order = { ...order };
@@ -17,6 +17,7 @@ export class MemoryOrderRepo implements OrderRepo {
   readonly kind = 'memory';
   private orders = new Map<string, Order>();
   private topUps: TopUp[] = [];
+  private users = new Map<string, User>();
 
   async check() {}
 
@@ -71,4 +72,21 @@ export class MemoryOrderRepo implements OrderRepo {
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
       .map((t) => ({ ...t }));
   }
+
+  async createUser(user: User) {
+    if (this.users.has(user.username)) throw new UsernameTakenError(user.username);
+    if ([...this.users.values()].some((u) => u.address === user.address)) throw new AddressRegisteredError(user.address);
+    this.users.set(user.username, { ...user });
+  }
+
+  async getUserByUsername(username: string) {
+    const user = this.users.get(username);
+    return user ? { ...user } : null;
+  }
+
+  async getUserByAddress(address: string) {
+    const user = [...this.users.values()].find((u) => u.address === address);
+    return user ? { ...user } : null;
+  }
 }
+

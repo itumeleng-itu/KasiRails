@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Order, OrderStatus, OrderType, TopUp } from '@kasi-rails/shared';
-import type { OrderPatch, OrderRepo } from './types';
+import type { Order, OrderStatus, OrderType, TopUp, User } from '@kasi-rails/shared';
+import { AddressRegisteredError, UsernameTakenError, type OrderPatch, type OrderRepo } from './types';
 
 interface OrderRow {
   id: string;
@@ -25,7 +25,15 @@ interface TopUpRow {
   created_at: string;
 }
 
+interface UserRow {
+  username: string;
+  address: string;
+  created_at: string;
+}
+
 const toIso = (ts: string) => new Date(ts).toISOString();
+
+const userFromRow = (r: UserRow): User => ({ username: r.username, address: r.address, createdAt: toIso(r.created_at) });
 
 function fromRow(row: OrderRow): Order {
   const order: Order = {
@@ -67,7 +75,7 @@ export class SupabaseOrderRepo implements OrderRepo {
 
   async check() {
     // Not a HEAD request: those report success even when the table is missing.
-    for (const table of ['orders', 'topups']) {
+    for (const table of ['orders', 'topups', 'users']) {
       const { error } = await this.db.from(table).select('id').limit(1);
       if (error?.code === 'PGRST205') {
         throw new Error(`Supabase table "${table}" is missing. Run apps/server/supabase/schema.sql in the Supabase SQL Editor.`);
@@ -164,5 +172,27 @@ export class SupabaseOrderRepo implements OrderRepo {
       createdAt: toIso(r.created_at),
     }));
   }
+
+  async createUser(user: User) {
+    const { error } = await this.db.from('users').insert({ username: user.username, address: user.address, created_at: user.createdAt });
+    if (!error) return;
+    if (error.code === '23505') {
+      // Unique violation: which constraint tells us whether the name or the address is taken.
+      if (/address/i.test(error.message)) throw new AddressRegisteredError(user.address);
+      throw new UsernameTakenError(user.username);
+    }
+    throw new Error(`Supabase insert user failed: ${error.message}`);
+  }
+
+  async getUserByUsername(username: string) {
+    const row = unwrap(await this.db.from('users').select('*').eq('username', username).maybeSingle<UserRow>(), 'get user');
+    return row ? userFromRow(row) : null;
+  }
+
+  async getUserByAddress(address: string) {
+    const row = unwrap(await this.db.from('users').select('*').eq('address', address).maybeSingle<UserRow>(), 'get user');
+    return row ? userFromRow(row) : null;
+  }
 }
+
 
