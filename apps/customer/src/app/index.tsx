@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   rate: { fontSize: 15, color: colors.muted, marginTop: 8 },
   error: { fontSize: 16, color: colors.danger },
   actions: { flexDirection: 'row', gap: 12 },
-  action: { flex: 1, minHeight: 64 },
+  action: { flex: 1 },
   sectionTitle: { fontSize: 20, fontWeight: '800', color: colors.fg, marginTop: 8, textAlign: 'center' },
   emptyBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 32 },
   empty: { fontSize: 18, color: colors.muted, textAlign: 'center' },

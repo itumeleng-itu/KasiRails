@@ -32,7 +32,7 @@ export function BigButton(props: {
         pressed && styles.pressed,
         style,
       ]}>
-      {busy ? <ActivityIndicator color={colors.fg} size="large" /> : <Text style={styles.buttonText}>{label}</Text>}
+      {busy ? <ActivityIndicator color={colors.fg} /> : <Text style={styles.buttonText}>{label}</Text>}
     </Pressable>
   );
 }
@@ -48,17 +48,17 @@ export function Message(props: { title: string; body?: string; tone?: 'danger' |
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 72,
-    borderRadius: 16,
+    minHeight: 54,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
   primary: { backgroundColor: colors.primary },
-  secondary: { backgroundColor: colors.bg, borderWidth: 3, borderColor: colors.fg },
+  secondary: { backgroundColor: colors.bg, borderWidth: 2, borderColor: colors.fg },
   disabled: { opacity: 0.4 },
   pressed: { opacity: 0.75 },
-  buttonText: { fontSize: 26, fontWeight: '800', color: colors.fg },
+  buttonText: { fontSize: 19, fontWeight: '800', color: colors.fg },
   message: { gap: 8, alignItems: 'center', paddingHorizontal: 8 },
   messageTitle: { fontSize: 26, fontWeight: '800', color: colors.fg, textAlign: 'center' },
   messageBody: { fontSize: 19, color: colors.muted, textAlign: 'center', lineHeight: 26 },

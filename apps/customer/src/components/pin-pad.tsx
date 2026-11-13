@@ -64,10 +64,10 @@ const styles = StyleSheet.create({
   dot: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: colors.fg },
   dotFilled: { backgroundColor: colors.fg },
   row: { flexDirection: 'row', gap: 12 },
-  key: { flex: 1, minHeight: 66, borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
+  key: { flex: 1, minHeight: 58, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
   keyBg: { backgroundColor: colors.card },
   pressed: { opacity: 0.6 },
   disabled: { opacity: 0.4 },
-  keyText: { fontSize: 30, fontWeight: '700', color: colors.fg },
+  keyText: { fontSize: 26, fontWeight: '700', color: colors.fg },
   extraText: { fontSize: 16, fontWeight: '700' },
 });

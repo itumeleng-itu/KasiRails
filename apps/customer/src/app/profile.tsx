@@ -90,13 +90,13 @@ export default function Profile() {
         </Pressable>
       </View>
 
-      {bio?.available ? (
+      {bio?.available || bio?.unavailableReason ? (
         <View style={styles.row}>
           <View style={styles.flex}>
             <Text style={styles.rowTitle}>Log in with {bio.label}</Text>
-            <Text style={styles.rowBody}>Your PIN always works too.</Text>
+            <Text style={styles.rowBody}>{bio.unavailableReason ?? 'Your PIN always works too.'}</Text>
           </View>
-          <Switch value={bioOn} onValueChange={toggleBiometrics} trackColor={{ true: colors.primary }} />
+          <Switch value={bio.available && bioOn} onValueChange={toggleBiometrics} disabled={!bio.available} trackColor={{ true: colors.primary }} />
         </View>
       ) : null}
 

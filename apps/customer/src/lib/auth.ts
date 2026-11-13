@@ -1,3 +1,4 @@
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { sha256, stringToBytes, toHex, type Hex } from 'viem';
@@ -137,7 +138,12 @@ export interface BiometricInfo {
   available: boolean;
   /** "Face ID", "face unlock" or "fingerprint" */
   label: string;
+  /** Why it can't be used here, when the phone has it but this build can't use it. */
+  unavailableReason?: string;
 }
+
+/** Running inside the Expo Go app (development), not an installed Kasi Rails build. */
+const inExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 export async function getBiometricInfo(): Promise<BiometricInfo> {
   try {
@@ -148,6 +154,13 @@ export async function getBiometricInfo(): Promise<BiometricInfo> {
     ]);
     const face = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
     const label = face ? (process.env.EXPO_OS === 'ios' ? 'Face ID' : 'face unlock') : 'fingerprint';
+    // Expo Go can't use Face ID on iPhone; it needs the installed app (a development build).
+    if (inExpoGo && process.env.EXPO_OS === 'ios' && face) {
+      return { available: false, label, unavailableReason: 'Face ID works in the installed Kasi Rails app, not in Expo Go. Use your PIN for now.' };
+    }
+    if (hardware && !enrolled) {
+      return { available: false, label, unavailableReason: `Set up ${label} in your phone's settings first.` };
+    }
     return { available: hardware && enrolled, label };
   } catch {
     return { available: false, label: 'fingerprint' };
